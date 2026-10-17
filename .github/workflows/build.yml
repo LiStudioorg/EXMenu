@@ -35,6 +35,22 @@ jobs:
           java-version: '21'
           cache: maven
 
+      # tag 构建时以 tag 号为准覆盖 pom 版本，发行前不需要手动 bump。
+      # v1.2.0 -> 1.2.0；v1.2.0-rc.1 -> 1.2.0-rc.1（合法 Maven 版本）。
+      # 分支 / PR 构建保持 pom 里的版本，行为不变。
+      - name: Apply tag version to poms
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -euo pipefail
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          POM_VERSION=$(mvn -q -DforceStdout -f newgen/pom.xml help:evaluate -Dexpression=project.version)
+          if [ "$TAG_VERSION" != "$POM_VERSION" ]; then
+            echo "pom 版本 $POM_VERSION 与 tag $TAG_VERSION 不一致，以 tag 覆盖（这是预期行为，无需改代码）"
+          fi
+          mvn --batch-mode --no-transfer-progress -q \
+            org.codehaus.mojo:versions-maven-plugin:2.16.2:set \
+            -DnewVersion="$TAG_VERSION" -DgenerateBackupPoms=false
+
       # 依赖全部来自公开仓库（papermc / codemc / spigot / extendedclip / jitpack），
       # 不需要任何私有 Maven 凭据
       - name: Build with Maven
