@@ -12,6 +12,14 @@
     <name>EXMenu-Parent</name>
     <description>EXMenu 聚合构建入口</description>
 
+    <licenses>
+        <license>
+            <name>GNU Affero General Public License v3.0 or later</name>
+            <url>https://www.gnu.org/licenses/agpl-3.0.html</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
     <!--
         本仓库只有一个模块：newgen（EXMenu）。
 

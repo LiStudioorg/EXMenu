@@ -5,6 +5,7 @@
 ![适用核心](https://img.shields.io/badge/适用核心-Spigot%20%7C%20Folia-blue)
 ![API](https://img.shields.io/badge/API-1.13%2B-blue)
 ![Java](https://img.shields.io/badge/运行时-Java%2017%2B-orange)
+![许可证](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue)
 
 一款 **YAML 驱动**的 Minecraft 箱子菜单插件。服主用 YAML 描述「菜单长什么样、点了执行什么」，
 插件负责渲染界面与执行逻辑。
@@ -167,4 +168,18 @@ EXMenu 是重写，**不是**无缝升级 —— 没有任何东西会自动迁�
 
 ## 许可证
 
-见 [LICENSE](LICENSE)。
+**Copyright © 2026 LiStudioorg。** EXMenu 采用 **GNU Affero General Public License v3.0
+或更高版本（AGPL-3.0-or-later）**，全文见 [LICENSE](LICENSE)。
+
+实际含义：
+
+- 你可以自由使用、研究、修改、再分发 EXMenu —— 免费或收费均可。
+- **任何修改版 / 衍生版的分发，都必须以同一许可证附带完整对应源码。
+  闭源商用分发不被允许。**
+- **把修改版放在玩家通过网络连接的服务器上运行，同样触发源码义务（AGPL 第 13 条）**——
+  必须向这些玩家提供修改后的源码。这一条是刻意堵死「私服魔改、不分发、不开源」的漏洞，
+  也就是 Minecraft 插件最常见的商用滥用方式。
+- **赞助与付费授权：** 许可证约束除版权方以外的所有人。LiStudioorg 可以接受赞助、
+  出售付费版本、或以其它条款单独授予商业许可（双重许可）。洽谈请开 GitHub Issue。
+- shade 进 jar 的第三方库（IFramework、XSeries、HikariCP、sqlite-jdbc、item-nbt-api）
+  仍受各自许可证约束。

@@ -5,6 +5,7 @@
 ![Core](https://img.shields.io/badge/core-Spigot%20%7C%20Folia-blue)
 ![API](https://img.shields.io/badge/api-1.13%2B-blue)
 ![Java](https://img.shields.io/badge/runtime-Java%2017%2B-orange)
+![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue)
 
 A YAML-driven chest-menu plugin for Minecraft servers. Server owners describe what a menu looks
 like and what a button does in plain YAML files; the plugin renders the GUI and executes the logic.
@@ -174,4 +175,20 @@ EXMenu is a rewrite, **not** a drop-in update — nothing migrates automatically
 
 ## License
 
-See [LICENSE](LICENSE).
+**Copyright © 2026 LiStudioorg.** EXMenu is licensed under the
+**GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)** — full text in [LICENSE](LICENSE).
+
+In practical terms:
+
+- You may use, study, modify and redistribute EXMenu — gratis or for a fee.
+- **Any distribution of a modified or derivative build must ship the complete corresponding
+  source under the same license. Closed-source commercial redistribution is not allowed.**
+- **Running a modified version on a server that players connect to over the network also
+  triggers the source obligation (AGPL §13)** — those users must be offered the modified
+  source. This deliberately closes the "host a fork, never distribute, never release"
+  loophole, the common commercial abuse pattern for Minecraft plugins.
+- **Sponsorship & paid licensing:** the license binds everyone *except* the copyright holder.
+  LiStudioorg may accept sponsorships, sell paid builds, or grant separate commercial
+  licenses under different terms (dual licensing). Inquiries: open a GitHub issue.
+- Third-party libraries shaded into the jar (IFramework, XSeries, HikariCP, sqlite-jdbc,
+  item-nbt-api) remain under their own licenses.
