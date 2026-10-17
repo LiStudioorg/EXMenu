@@ -49,7 +49,18 @@ jobs:
           fi
           mvn --batch-mode --no-transfer-progress -q \
             org.codehaus.mojo:versions-maven-plugin:2.16.2:set \
-            -DnewVersion="$TAG_VERSION" -DgenerateBackupPoms=false
+            -DnewVersion="$TAG_VERSION" -DgenerateBackupPoms=false \
+            -DprocessAllModules=true
+          mvn --batch-mode --no-transfer-progress -q \
+            org.codehaus.mojo:versions-maven-plugin:2.16.2:set \
+            -f newgen/pom.xml -DnewVersion="$TAG_VERSION" -DgenerateBackupPoms=false
+          # 覆盖后立即验证：后续构建与产物命名都以 module 版本为准
+          ACTUAL=$(mvn -q -DforceStdout -f newgen/pom.xml help:evaluate -Dexpression=project.version)
+          if [ "$ACTUAL" != "$TAG_VERSION" ]; then
+            echo "::error::版本覆盖失败: newgen pom 仍为 $ACTUAL，期望 $TAG_VERSION"
+            exit 1
+          fi
+          echo "版本覆盖生效: newgen -> $TAG_VERSION"
 
       # 依赖全部来自公开仓库（papermc / codemc / spigot / extendedclip / jitpack），
       # 不需要任何私有 Maven 凭据
