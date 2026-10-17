@@ -1,6 +1,6 @@
-# PlayerMenu 文档
+# EXMenu 文档
 
-> PlayerMenuNG ｜ 一款有点好用的玩家菜单插件
+> EXMenu ｜ 一款有点好用的玩家菜单插件
 
 ---
 
@@ -19,7 +19,7 @@
 - 想知道**某条指令怎么用** → [指令文档](COMMANDS.md)
 - 想**改源码 / 加功能** → [开发文档](DEVELOPMENT.md)（有完整扩展指南）
 - 想**快速了解整体结构** → [架构文档](ARCHITECTURE.md)
-- 想**排查菜单配置错误** → `/plm check`（见[指令文档](COMMANDS.md#plm-check-菜单)）
+- 想**排查菜单配置错误** → `/exmenu check`（见[指令文档](COMMANDS.md#exmenu-check-菜单)）
 
 ---
 
@@ -27,7 +27,7 @@
 
 ### 1. 安装
 
-把 `PlayerMenuNG-1.0.0.jar` 放入 `plugins/` 目录，重启服务器。
+把 `EXMenu-1.0.0.jar` 放入 `plugins/` 目录，重启服务器。
 
 **可选依赖**（按需安装）：
 
@@ -39,7 +39,7 @@
 ### 2. 打开默认菜单
 
 ```
-/plm open example.yml
+/exmenu open example.yml
 ```
 
 或在菜单里绑定 `openCommand` / 使用时钟物品（需在 `config.yml` 开启 `clock.enable`）。
@@ -49,14 +49,14 @@
 **方式一：生成骨架后手动编辑**
 
 ```
-/plm create 我的菜单
+/exmenu create 我的菜单
 ```
 
-会在 `plugins/PlayerMenuNG/menu/我的菜单.yml` 生成一个可用的骨架，然后手动编辑。
+会在 `plugins/EXMenu/menu/我的菜单.yml` 生成一个可用的骨架，然后手动编辑。
 
 **方式二：手动编辑 YAML**
 
-在 `plugins/PlayerMenuNG/menu/` 下新建 `.yml` 文件：
+在 `plugins/EXMenu/menu/` 下新建 `.yml` 文件：
 
 ```yaml
 title: '&8我的菜单'
@@ -73,16 +73,16 @@ buttons:
       - '[console] give %player_name% diamond 1'
 ```
 
-执行 `/plm reload` 生效。
+执行 `/exmenu reload` 生效。
 
 ### 4. 常用指令
 
 ```
-/plm reload              重载配置（改完配置必执行）
-/plm open <菜单名>        打开菜单
-/plm create <菜单名>      生成菜单骨架
-/plm check               校验全部菜单配置
-/plm getMaterial         查看手持物品的材质名
+/exmenu reload              重载配置（改完配置必执行）
+/exmenu open <菜单名>        打开菜单
+/exmenu create <菜单名>      生成菜单骨架
+/exmenu check               校验全部菜单配置
+/exmenu getMaterial         查看手持物品的材质名
 ```
 
 完整列表见 [指令文档](COMMANDS.md)。
@@ -106,7 +106,7 @@ buttons:
 
 以下几条按「踩坑频率」排序，详细说明见 [配置文档](CONFIGURATION.md)。
 
-1. **改完配置必须 `/plm reload`**，否则不生效
+1. **改完配置必须 `/exmenu reload`**，否则不生效
 2. **`id` 是限购/冷却的前提** —— 没有非零 `id`，`cd` 和 `limit` 全部无效
 3. **`id` 必须全局唯一** —— 重复会导致按钮共享计数器
 4. **`commands` 不能有空行** —— 空行会导致后续命令**全部不执行**
@@ -130,7 +130,7 @@ mvn clean package
 cd newgen && mvn clean package
 ```
 
-产物：`newgen/target/PlayerMenuNG-1.0.0.jar`
+产物：`newgen/target/EXMenu-1.0.0.jar`
 
 - 依赖全部来自**公开 Maven 仓库**，无需任何私有仓库凭据
 - 目标字节码为 **Java 17**，支持 **Spigot 与 Folia**
@@ -142,4 +142,4 @@ cd newgen && mvn clean package
 
 - 使用教程 Wiki：<https://ricedoc.handyplus.cn/wiki/PlayerMenu/README/>
 - SpigotMC 页面：<https://www.spigotmc.org/resources/117019/>
-- 问题反馈：<https://github.com/handy-git/PlayerMenu/issues>
+- 问题反馈：<https://github.com/LiStudioorg/EXMenu/issues>

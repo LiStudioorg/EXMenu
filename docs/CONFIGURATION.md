@@ -1,6 +1,6 @@
-# PlayerMenuNG 配置文档
+# EXMenu 配置文档
 
-> 面向**服主 / 配置者**。描述 **PlayerMenuNG**（`newgen` 模块）的全部配置项。
+> 面向**服主 / 配置者**。描述 **EXMenu**（`newgen` 模块）的全部配置项。
 >
 > 只想看指令怎么用？见 [指令文档](COMMANDS.md)。
 > 想改源码？见 [开发文档](DEVELOPMENT.md)。
@@ -12,14 +12,14 @@
 1. [配置文件总览](#1-配置文件总览)
 2. [config.yml](#2-configyml)
 3. [storage.yml](#3-storageyml)
-4. [菜单文件 menu/*.yml](#4-菜单文件-menuyyml)
+4. [菜单文件 menu/*.yml](#4-菜单文件-menuyml)
 5. [按钮属性全表](#5-按钮属性全表)
 6. [动作标签（commands）](#6-动作标签commands)
 7. [条件表达式](#7-条件表达式)
 8. [限制系统：冷却与限购](#8-限制系统冷却与限购)
 9. [商店与交易](#9-商店与交易)
 10. [输入系统](#10-输入系统)
-11. [confirm.yml 与 item.yml](#11-confirmyyml-与-itemyml)
+11. [confirm.yml 与 item.yml](#11-confirmyml-与-itemyml)
 12. [语言文件](#12-语言文件)
 13. [常见配置陷阱](#13-常见配置陷阱)
 
@@ -27,7 +27,7 @@
 
 ## 1. 配置文件总览
 
-首次启动后，插件数据目录（`plugins/PlayerMenuNG/`）下会出现：
+首次启动后，插件数据目录（`plugins/EXMenu/`）下会出现：
 
 ```
 config.yml                插件主配置
@@ -40,10 +40,10 @@ languages/en_US.yml
 menu/example.yml          示例菜单
 ```
 
-**数据目录名是 `PlayerMenuNG`**（不是旧版的 `PlayerMenu`），两类插件的配置**不通用**。
+**数据目录名是 `EXMenu`**（不是旧版的 `PlayerMenu`），两类插件的配置**不通用**。
 
 `menu/` 下每个 `.yml` 就是一个菜单，**文件名（含 `.yml`）即菜单名**。新增文件后执行
-`/plm reload` 生效。
+`/exmenu reload` 生效。
 
 > ⚠️ **升级自旧版 PlayerMenu 的服主请注意**：菜单文件格式、`config.yml`、`storage.yml`
 > 全部是**新的**，旧文件不能直接使用。详见 [第 13 节](#13-常见配置陷阱)。
@@ -60,7 +60,7 @@ language: zh_CN
 noWorld:
   - "notWorld"
 
-# 使用 /plm create 创建菜单时是否自动生成 id
+# 使用 /exmenu create 创建菜单时是否自动生成 id
 autoCreateId: true
 
 # 是否需要菜单打开权限。
@@ -70,7 +70,7 @@ permission: false
 # 聊天输入等待超时（秒），<= 0 表示不超时
 inputTimeout: 30
 
-# 时钟物品：进服赠送 / /plm clock 取回
+# 时钟物品：进服赠送 / /exmenu clock 取回
 clock:
   enable: false
   menu: example.yml
@@ -101,7 +101,7 @@ isCheckUpdate: false
 |---|---|---|---|
 | `language` | String | `zh_CN` | 语言文件，可选 `zh_CN` / `zh_TW` / `en_US` |
 | `noWorld` | List | `[notWorld]` | **世界黑名单**：列表内世界无法打开任何菜单 |
-| `autoCreateId` | Boolean | `true` | `/plm create` 生成的菜单是否自动写入 `id` |
+| `autoCreateId` | Boolean | `true` | `/exmenu create` 生成的菜单是否自动写入 `id` |
 | `permission` | Boolean | `false` | **是否启用菜单权限**。`true` 时菜单文件的 `permission` 节点才生效 |
 | `inputTimeout` | Int | `30` | 聊天输入等待秒数；`<= 0` 表示不超时 |
 | `isCheckUpdate` | Boolean | `false` | 是否检查更新 |
@@ -122,7 +122,7 @@ isCheckUpdate: false
 > 所有通过物品触发的入口都统一打开这一个菜单。要让不同物品开不同菜单，
 > 必须让 `clock.enable: false`。
 
-`clock.enable: false` 时进服不赠送，`/plm clock` 也会提示"时钟物品功能未启用"。
+`clock.enable: false` 时进服不赠送，`/exmenu clock` 也会提示"时钟物品功能未启用"。
 
 ### 2.3 `shift.F` —— Shift+F 打开菜单
 
@@ -157,7 +157,7 @@ isCheckUpdate: false
 
 ### 2.5 热重载
 
-`/plm reload` 会重载 `config.yml`、语言文件、`menu/` 下全部菜单、`gui/` 两个界面配置，
+`/exmenu reload` 会重载 `config.yml`、语言文件、`menu/` 下全部菜单、`gui/` 两个界面配置，
 并**丢弃按钮缓存**。
 
 > ⚠️ **`storage.yml` 不支持热重载**，修改后必须重启服务器。
@@ -204,7 +204,7 @@ mysql:
 > 多写连接只会互相阻塞并提高 `SQLITE_BUSY` 概率，串行化反而更快更稳。
 > 同时开启 `journal_mode=WAL`（允许读写并发）与 `busy_timeout=5000`（遇锁等待而非立即失败）。
 
-> ⚠️ **修改本文件后需要重启服务器**，`/plm reload` 不会切换存储后端。
+> ⚠️ **修改本文件后需要重启服务器**，`/exmenu reload` 不会切换存储后端。
 
 ---
 
@@ -609,7 +609,7 @@ conditionsHide:
 ### 8.4 清理限制数据
 
 ```
-/plm clear <菜单|all> [玩家]
+/exmenu clear <菜单|all> [玩家]
 ```
 
 ---
@@ -757,7 +757,7 @@ cancelSound: BLOCK_NOTE_BLOCK_BASS
 
 ### 11.2 `gui/item.yml` —— 物品库界面
 
-`/plm item` 存入的物品在这里浏览。
+`/exmenu item` 存入的物品在这里浏览。
 
 ```yaml
 size: 54
@@ -843,10 +843,10 @@ noTimeLimit: '&c请等待 &e%time% &c秒后再试'
 |---|---|---|
 | 按钮完全不显示 | 没写 `slot` / `slots` | 补上槽位（**这是唯一必需字段**） |
 | 按钮点击没反应 | `id` 重复，或 `slot` 被高 `priority` 按钮占用 | 检查 `id` 唯一性、调整 `priority` |
-| 后半段命令不执行 | `commands` 里有**空行**或标签拼错 | 删空行；用 `/plm check` 定位 |
+| 后半段命令不执行 | `commands` 里有**空行**或标签拼错 | 删空行；用 `/exmenu check` 定位 |
 | CD / 限购无效 | `id` 为 `0` 或未配置 | 给按钮一个唯一的非零 `id` |
 | 限购计数错乱 | 多个按钮共用同一个 `id` | 让每个按钮的 `id` 唯一 |
-| 改完配置没生效 | 忘记 `/plm reload` | 执行 `/plm reload` |
+| 改完配置没生效 | 忘记 `/exmenu reload` | 执行 `/exmenu reload` |
 | 按钮对所有人隐藏 | `conditions` 右侧留空 | 条件两侧都要有值 |
 | 属性/附魔不显示 | `hideFlag` / `hideEnchant` 默认 `true` | 显式设为 `false` |
 | 商店点了没反应 | `shopType` 写成了 `buy` / `sell` | 改用 `leftBuyRightSell` |
@@ -866,14 +866,14 @@ noTimeLimit: '&c请等待 &e%time% &c秒后再试'
 8. **`clock.menu` 一旦填写，会覆盖所有 `openItem`。**
 9. **`storage.yml` 改动必须重启服务器。**
 10. **升级自旧版 PlayerMenu 时，配置与菜单文件都不能直接复用** —— 数据目录
-    （`PlayerMenuNG` vs `PlayerMenu`）、菜单格式（`buttons` 列表 vs `menu` 映射）、
+    （`EXMenu` vs `PlayerMenu`）、菜单格式（`buttons` 列表 vs `menu` 映射）、
     配置键全部不同。
 
-### 13.3 用 `/plm check` 自检
+### 13.3 用 `/exmenu check` 自检
 
 ```
-/plm check            # 校验全部菜单
-/plm check <菜单>      # 校验单个菜单
+/exmenu check            # 校验全部菜单
+/exmenu check <菜单>      # 校验单个菜单
 ```
 
 它会一次性列出以下问题：
@@ -886,7 +886,7 @@ noTimeLimit: '&c请等待 &e%time% &c秒后再试'
 - 槽位超出界面范围
 
 > 💡 这些问题在运行时的表现都是"按钮没反应"，**极难排查** ——
-> 改完菜单后跑一次 `/plm check` 是最省事的做法。
+> 改完菜单后跑一次 `/exmenu check` 是最省事的做法。
 
 ---
 

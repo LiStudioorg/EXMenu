@@ -1,5 +1,5 @@
 # 物品库界面。
-# 用于浏览 menu_item 表里已存入的物品（/plm item 存入的那些）。
+# 用于浏览 menu_item 表里已存入的物品（/exmenu item 存入的那些）。
 size: 54
 title: '&8物品库'
 

@@ -1,8 +1,8 @@
 # Issue tracker: GitHub
 
-Issues and specs for this repo live as GitHub issues in **`xgp2012/PlayerMenu-EX`**. Use the `gh` CLI for all operations.
+Issues and specs for this repo live as GitHub issues in **`LiStudioorg/EXMenu`**. Use the `gh` CLI for all operations.
 
-> Note: `upstream` points at `handy-git/PlayerMenu`, the project this repo forked from. Issues for **this** repo go to `xgp2012/PlayerMenu-EX` — pass `--repo xgp2012/PlayerMenu-EX` when the CWD-implied repo is ambiguous.
+> Note: `upstream` points at `handy-git/PlayerMenu`, the project this repo forked from. Issues for **this** repo go to `LiStudioorg/EXMenu` — pass `--repo LiStudioorg/EXMenu` when the CWD-implied repo is ambiguous.
 
 ## Conventions
 

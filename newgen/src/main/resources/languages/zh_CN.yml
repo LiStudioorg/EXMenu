@@ -1,7 +1,7 @@
-# PlayerMenuNG 语言文件 - 简体中文
+# EXMenu 语言文件 - 简体中文
 # 键名对应代码里的 LangUtil.message/plain/format 调用，请勿改动键名
 
-prefix: '&8[&bPlayerMenu&8] &r'
+prefix: '&8[&bEXMenu&8] &r'
 
 # 通用
 noPermission: '&c你没有权限执行此操作'

@@ -1,4 +1,4 @@
-# PlayerMenuNG 架构文档
+# EXMenu 架构文档
 
 > 面向**开发者 / 维护者**。描述重写版插件的分层、数据流、线程模型与扩展点。
 >
@@ -9,10 +9,10 @@
 
 ## 1. 这是什么
 
-PlayerMenuNG 是 PlayerMenu v1.11.0 的**重写实现**：保持 YAML 配置语义与用户使用方式，
+EXMenu 是 PlayerMenu v1.11.0 的**重写实现**：保持 YAML 配置语义与用户使用方式，
 但去掉了 HandyLib 依赖，改为只依赖公开 Maven 仓库的库。
 
-| 维度 | 旧实现 (PlayerMenu) | 重写版 (PlayerMenuNG) |
+| 维度 | 旧实现 (PlayerMenu) | 重写版 (EXMenu) |
 |---|---|---|
 | 构建 | Maven + **私有仓库**（HandyLib / HandyBom） | Maven + 全公开仓库 |
 | 框架 | HandyLib 3.41.6 注解扫描 | 原生 `JavaPlugin` + `plugin.yml` |
@@ -22,7 +22,7 @@ PlayerMenuNG 是 PlayerMenu v1.11.0 的**重写实现**：保持 YAML 配置语�
 | 存储 | HandyLib `Db` 链式 API | **原生 JDBC + HikariCP** |
 | 源码规模 | 61 文件 / 211 KB | 35 文件 / 325 KB（含更多注释） |
 
-**产物**：`newgen/target/PlayerMenuNG-1.0.0.jar`（约 16 MB，已 shade 并重定位）。
+**产物**：`newgen/target/EXMenu-1.0.0.jar`（约 16 MB，已 shade 并重定位）。
 
 ---
 
@@ -99,7 +99,7 @@ PlayerMenuNG 是 PlayerMenu v1.11.0 的**重写实现**：保持 YAML 配置语�
 
 ## 4. 配置快照与热重载
 
-`MenuConfig` 是**不可变快照**：启动或 `/plm reload` 时从磁盘重建整个对象，
+`MenuConfig` 是**不可变快照**：启动或 `/exmenu reload` 时从磁盘重建整个对象，
 之后所有代码只读它，不做增量更新（配置项之间存在耦合，整体替换更安全）。
 
 **reload 的实现要点**：`MenuConfig.reload(plugin)` 内部调用 `load(plugin)` 造一个新对象，
@@ -107,7 +107,7 @@ PlayerMenuNG 是 PlayerMenu v1.11.0 的**重写实现**：保持 YAML 配置语�
 `ConfigProvider` 接口持有引用，无法把新对象塞回去。字段赋值集中在最后统一进行，
 中途抛异常时旧配置仍完整可用，不会出现"配置读了一半"的半残状态。
 
-**`/plm reload` 还需要丢弃按钮缓存** —— 见 `MenuGuiManager.invalidateCache()`。
+**`/exmenu reload` 还需要丢弃按钮缓存** —— 见 `MenuGuiManager.invalidateCache()`。
 只刷新配置而不丢缓存，玩家会一直看到旧按钮直到重连。
 
 > ⚠️ `storage.yml` **不支持**热重载，改动需重启服务器 —— 连接池一旦建立，
@@ -431,21 +431,21 @@ AsyncPlayerChatEvent (LOWEST, ignoreCancelled=true)
 
 ## 13. 权限模型
 
-权限节点统一为 `playerMenu.<子命令>`，集中在 `MainCommand.PERMISSIONS` 表：
+权限节点统一为 `exmenu.<子命令>`，集中在 `MainCommand.PERMISSIONS` 表：
 
 | 子命令 | 权限 | 默认 |
 |---|---|---|
-| `open` | `playerMenu.open` | 所有玩家 |
-| `close` | `playerMenu.close` | 所有玩家 |
-| `clock` | `playerMenu.clock` | 所有玩家 |
-| `reload` | `playerMenu.reload` | OP |
-| `create` / `view` | `playerMenu.create` / `.view` | OP |
+| `open` | `exmenu.open` | 所有玩家 |
+| `close` | `exmenu.close` | 所有玩家 |
+| `clock` | `exmenu.clock` | 所有玩家 |
+| `reload` | `exmenu.reload` | OP |
+| `create` / `view` | `exmenu.create` / `.view` | OP |
 | `item` / `addItem` / `getItem` | 同名 | OP |
 | `getMaterial` / `clear` / `convert` | 同名 | OP |
-| `adminOpen` | `playerMenu.adminOpen` | OP |
-| `check` | `playerMenu.check` | OP |
+| `adminOpen` | `exmenu.adminOpen` | OP |
+| `check` | `exmenu.check` | OP |
 
-`hasPerm()` 在控制台发送者下**直接放行**，并额外接受 `playerMenu.*` 通配。
+`hasPerm()` 在控制台发送者下**直接放行**，并额外接受 `exmenu.*` 通配。
 
 **菜单级权限**：`menu/*.yml` 的 `permission` 节点，`config.yml` 的 `permission: true`
 时生效。
@@ -463,7 +463,7 @@ AsyncPlayerChatEvent (LOWEST, ignoreCancelled=true)
 | 点击被拒提示 | 统一"操作未完成" | **按原因区分** | 可排查 |
 | 输入容器 | 非并发 Map | `ConcurrentHashMap` | 线程安全 |
 | 限制写库 | 读后写（有竞态） | **原子 UPDATE** | 修缺陷 |
-| 裸 `/plm` 帮助 | 被 `reload` 权限硬编码拦截 | **无需权限** | 普通玩家能看到"没权限"而非"未知命令" |
+| 裸 `/exmenu` 帮助 | 被 `reload` 权限硬编码拦截 | **无需权限** | 普通玩家能看到"没权限"而非"未知命令" |
 | `[close]` 的 NPE | 确认界面下 `handyInventory == null` 崩溃 | 空值保护 | 修缺陷 |
 | 硬编码中文 | 命令类里有 | 全部走 `LangUtil` | 可本地化 |
 
@@ -480,7 +480,7 @@ AsyncPlayerChatEvent (LOWEST, ignoreCancelled=true)
 | `action.*` 用 `getBoolean()` 读取，而配置写的是 `ALL` | **开箱即用时冷却、次数限制、经济动作全部被静默禁用** | 改为 `isActionEnabled()`，只有显式 `false/off/no/0` 才关闭 |
 | `[actionbar]` 不是任何枚举常量 | 该行报 configError 并**中断整条动作链**，后续 `[sound]` 不执行 | 从 `example.yml` 移除；`CommandTypeEnum` 无此标签 |
 | `[opPerformCommand]` 缺 `case` | 落到 `default` → configError → **中断动作链** | 补 `OP_PERFORM_COMMAND` 分支（`前置命令;本体` 格式） |
-| `/plm reload` 不丢按钮缓存 | 重载后玩家**仍看到旧按钮**直到重连 | `handleReload` 显式调用 `invalidateCache()` |
+| `/exmenu reload` 不丢按钮缓存 | 重载后玩家**仍看到旧按钮**直到重连 | `handleReload` 显式调用 `invalidateCache()` |
 | `GuiContext.close()/refresh()` 传 null plugin | `Bukkit.getScheduler().runTask(null, …)` **NPE** | 新增 `wrapFor()` 实例方法固定 plugin；静态重载回退同步执行 |
 | 示例菜单条件 `'%player_name% != '` 右侧为空 | 条件恒不满足 → **按钮对所有人隐藏** | 改为 `!= 无`，并在注释中说明两侧都必须有值 |
 | **限购闸门"读后判断"** | 两个并发点击（或同一界面连点）都读到旧值而双双放行，`limit: 5` 可被用 6 次以上 | 新增 `MenuLimitService.tryIncrementWithinLimit()`，用 `UPDATE ... WHERE number < ?` 由数据库原子裁决；三条执行路径（直接点击、输入完成、确认界面）统一走该门槛 |
@@ -507,7 +507,7 @@ AsyncPlayerChatEvent (LOWEST, ignoreCancelled=true)
 5. **Shift+F 未实现** —— `config.yml` 的 `shift.F.enable/menu` 与
    `MenuConfig.isShiftEnable()/getShiftMenu()` 存在但无消费者。
 6. **`GuiTypeEnum` 整个类未被使用** —— 图形化创建/编辑菜单流程未实现，
-   `/plm create` 只生成骨架文件。
+   `/exmenu create` 只生成骨架文件。
 7. **`EconomyUtil` 只支持 Vault** —— 未接入 PlayerPoints / PlayerCurrency。
 8. **`hideEnchant`、`head`、`headBase`、`openItem` 解析后无渲染效果** ——
    `ItemStackUtil.applyHeadTexture()` 从未被调用。
@@ -584,7 +584,7 @@ cd newgen
 mvn clean package
 ```
 
-产物：`newgen/target/PlayerMenuNG-1.0.0.jar`
+产物：`newgen/target/EXMenu-1.0.0.jar`
 
 - 依赖全部来自公开仓库（papermc / codemc / spigot / extendedclip / jitpack）
 - **无需任何私有仓库凭据**
@@ -597,10 +597,10 @@ mvn clean package
 
 | 原包 | 重定位后 |
 |---|---|
-| `com.github.stefvanschie.inventoryframework` | `cn.handyplus.menu.ng.lib.if` |
-| `com.cryptomorin.xseries` | `cn.handyplus.menu.ng.lib.xseries` |
-| `de.tr7zw.changeme.nbtapi` | `cn.handyplus.menu.ng.lib.nbt` |
-| `de.tr7zw.annotations` | `cn.handyplus.menu.ng.lib.nbt.annotations` |
+| `com.github.stefvanschie.inventoryframework` | `cn.listudio.exmenu.lib.if` |
+| `com.cryptomorin.xseries` | `cn.listudio.exmenu.lib.xseries` |
+| `de.tr7zw.changeme.nbtapi` | `cn.listudio.exmenu.lib.nbt` |
+| `de.tr7zw.annotations` | `cn.listudio.exmenu.lib.nbt.annotations` |
 
 同时排除 `META-INF/*.SF`、`*.DSA`、`*.RSA`、`MANIFEST.MF`、`module-info.class`
 （签名文件会让重定位后的 jar 校验失败）。
@@ -609,7 +609,7 @@ mvn clean package
 基础库，重定位会破坏 JDBC 驱动发现机制）。
 
 > **重定位的后果**：源码 import 的是原始包名，编译期正常，
-> 但**运行期**这些类在 `cn.handyplus.menu.ng.lib.*` 下。
+> 但**运行期**这些类在 `cn.listudio.exmenu.lib.*` 下。
 > 新增代码若用反射按字符串查找它们，必须写重定位后的名字。
 
 `plugin.yml` 参与 Maven 资源过滤（可用 `${project.version}`），
@@ -624,7 +624,7 @@ mvn clean package
 |---|---|---|
 | `MenuPlugin` | 装配与接线 | 启动顺序不可调；同时是 `ConfigProvider` |
 | `MenuConfig` | 配置快照 | 整体重建；`reload` 就地刷新字段 |
-| `MainCommand` | 14 个子命令 | 路径穿越防护；`/plm check` 校验器 |
+| `MainCommand` | 14 个子命令 | 路径穿越防护；`/exmenu check` 校验器 |
 | `MenuGuiManager` | 渲染 + 点击回调 | 批量查库消除 N+1；`param.copy()` 防串味 |
 | `ConfirmGuiManager` | 二次确认界面 | 配置缺失时退化为直接执行 |
 | `ButtonParser` | YAML → 模型 | 宽容解析，结构性错误才丢弃 |

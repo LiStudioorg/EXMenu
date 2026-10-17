@@ -4,12 +4,12 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>cn.handyplus.menu.ng</groupId>
-    <artifactId>PlayerMenuNG</artifactId>
+    <groupId>cn.listudio.exmenu</groupId>
+    <artifactId>EXMenu</artifactId>
     <version>1.0.0</version>
     <packaging>jar</packaging>
 
-    <name>PlayerMenuNG</name>
+    <name>EXMenu</name>
     <description>YAML-driven Minecraft GUI menu plugin (Spigot + Folia)</description>
 
     <properties>
@@ -180,19 +180,19 @@
                             <relocations>
                                 <relocation>
                                     <pattern>com.github.stefvanschie.inventoryframework</pattern>
-                                    <shadedPattern>cn.handyplus.menu.ng.lib.if</shadedPattern>
+                                    <shadedPattern>cn.listudio.exmenu.lib.if</shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>com.cryptomorin.xseries</pattern>
-                                    <shadedPattern>cn.handyplus.menu.ng.lib.xseries</shadedPattern>
+                                    <shadedPattern>cn.listudio.exmenu.lib.xseries</shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>de.tr7zw.changeme.nbtapi</pattern>
-                                    <shadedPattern>cn.handyplus.menu.ng.lib.nbt</shadedPattern>
+                                    <shadedPattern>cn.listudio.exmenu.lib.nbt</shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>de.tr7zw.annotations</pattern>
-                                    <shadedPattern>cn.handyplus.menu.ng.lib.nbt.annotations</shadedPattern>
+                                    <shadedPattern>cn.listudio.exmenu.lib.nbt.annotations</shadedPattern>
                                 </relocation>
                             </relocations>
                             <filters>

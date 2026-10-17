@@ -5,7 +5,7 @@ language: zh_CN
 noWorld:
   - "notWorld"
 
-# 使用 /plm create 创建菜单时是否自动生成 id
+# 使用 /exmenu create 创建菜单时是否自动生成 id
 autoCreateId: true
 
 # 是否需要菜单打开权限。
@@ -15,7 +15,7 @@ permission: false
 # 聊天输入等待超时（秒），<= 0 表示不超时
 inputTimeout: 30
 
-# 时钟物品：进服赠送 / /plm clock 取回
+# 时钟物品：进服赠送 / /exmenu clock 取回
 clock:
   # 是否开启
   enable: false

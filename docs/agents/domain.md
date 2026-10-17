@@ -11,7 +11,7 @@ This repo is a **multi-context** repo. There is one domain context per sub-proje
 ├── CONTEXT-MAP.md          ← root map; points at each context's CONTEXT.md
 ├── docs/adr/               ← system-wide decisions
 └── newgen/
-    ├── CONTEXT.md          ← the newgen (PlayerMenuNG) context
+    ├── CONTEXT.md          ← the newgen (EXMenu) context
     └── docs/adr/           ← context-specific decisions
 ```
 

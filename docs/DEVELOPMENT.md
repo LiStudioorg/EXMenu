@@ -1,4 +1,4 @@
-# PlayerMenuNG 开发文档
+# EXMenu 开发文档
 
 > 面向**修改本插件源码**的开发者。
 > 只想配置菜单请看 [配置文档](CONFIGURATION.md)，只想知道指令怎么用请看 [指令文档](COMMANDS.md)。
@@ -32,20 +32,20 @@
 
 ## 1. 项目概览
 
-PlayerMenuNG 是一个 **YAML 驱动**的 Minecraft 箱子菜单插件。服主写 YAML 描述
+EXMenu 是一个 **YAML 驱动**的 Minecraft 箱子菜单插件。服主写 YAML 描述
 菜单长什么样、点了之后执行什么，插件负责渲染与执行。
 
 | 项目 | 值 |
 |---|---|
-| 插件名 | `PlayerMenuNG` |
-| 主类 | `cn.handyplus.menu.ng.MenuPlugin` |
+| 插件名 | `EXMenu` |
+| 主类 | `cn.listudio.exmenu.MenuPlugin` |
 | 源码 | `newgen/src/main/java/cn/handyplus/menu/ng/`（34 个文件，约 7300 行） |
 | 资源 | `newgen/src/main/resources/`（9 个 YAML） |
 | 字节码 | Java 17 |
 | 构建 | Maven（根 pom 为聚合 pom） |
-| 产物 | `newgen/target/PlayerMenuNG-1.0.0.jar`（约 16.4 MB） |
+| 产物 | `newgen/target/EXMenu-1.0.0.jar`（约 16.4 MB） |
 | 目标平台 | Spigot 与 Folia |
-| 指令 | `/playerMenu`，别名 `/plm` |
+| 指令 | `/exmenu`（无别名） |
 
 ### 与旧实现的关系
 
@@ -87,7 +87,7 @@ PlayerMenuNG 是一个 **YAML 驱动**的 Minecraft 箱子菜单插件。服主�
 > **为什么 JDBC 驱动与 HikariCP 不重定位**：`java.sql.Driver` 的注册依赖
 > `META-INF/services` 里写死的全限定类名，重定位后 ServiceLoader 找不到驱动。
 > 代价是若服务端已加载同名类可能冲突 —— 用独立连接池命名
-> （`PlayerMenuNG-SQLite` / `PlayerMenuNG-MySQL`）降低混淆风险。
+> （`EXMenu-SQLite` / `EXMenu-MySQL`）降低混淆风险。
 
 ### 2.2 构建命令
 
@@ -115,16 +115,16 @@ cd newgen && mvn clean package
 
 | 原始包 | 重定位后 |
 |---|---|
-| `com.github.stefvanschie.inventoryframework` | `cn.handyplus.menu.ng.lib.if` |
-| `com.cryptomorin.xseries` | `cn.handyplus.menu.ng.lib.xseries` |
-| `de.tr7zw.changeme.nbtapi` | `cn.handyplus.menu.ng.lib.nbt` |
-| `de.tr7zw.annotations` | `cn.handyplus.menu.ng.lib.nbt.annotations` |
+| `com.github.stefvanschie.inventoryframework` | `cn.listudio.exmenu.lib.if` |
+| `com.cryptomorin.xseries` | `cn.listudio.exmenu.lib.xseries` |
+| `de.tr7zw.changeme.nbtapi` | `cn.listudio.exmenu.lib.nbt` |
+| `de.tr7zw.annotations` | `cn.listudio.exmenu.lib.nbt.annotations` |
 
 同时排除 `META-INF/*.SF`、`*.DSA`、`*.RSA`、`MANIFEST.MF`、`module-info.class`。
 （签名文件会让重定位后的 jar 校验失败。）
 
 **重定位的后果**：源码里 import 的是**原始包名**，编译期正常，
-但**运行期**这些类在 `cn.handyplus.menu.ng.lib.*` 下。
+但**运行期**这些类在 `cn.listudio.exmenu.lib.*` 下。
 新增代码若用反射按字符串查找这些类，**必须写重定位后的名字**。
 
 ### 2.5 CI
@@ -141,7 +141,7 @@ cd newgen && mvn clean package
 ## 3. 包结构与分层
 
 ```
-cn.handyplus.menu.ng
+cn.listudio.exmenu
 ├── MenuPlugin.java              插件入口，负责装配与生命周期
 │
 ├── command/      presentation  指令解析与分发
@@ -198,7 +198,7 @@ presentation  →  render  →  core  →  persistence  →  model
 
 | 包 | 文件数 | 职责 |
 |---|---|---|
-| `command` | 1 | 解析 `/plm`，权限校验，Tab 补全 |
+| `command` | 1 | 解析 `/exmenu`，权限校验，Tab 补全 |
 | `listener` | 3 | 聊天输入拦截、时钟物品右键、玩家退出清理 |
 | `inventory` | 7 | 渲染与界面交互 |
 | `core` | 3 | 准入检查、动作执行、条件求值 |
@@ -228,7 +228,7 @@ presentation  →  render  →  core  →  persistence  →  model
 （拿 `noWorld`、`permission` 等开关），必须在步骤 1 之后；
 `MenuLimitService` 需要已初始化的 `Storage`，必须在步骤 2 之后。
 
-`registerCommand()` 取 `getCommand("playerMenu")`，若为 null 只记 SEVERE
+`registerCommand()` 取 `getCommand("exmenu")`，若为 null 只记 SEVERE
 并**不中止** `onEnable` —— 指令不可用，但菜单与其它功能仍正常工作。
 
 ### 4.1 依赖注入
@@ -254,7 +254,7 @@ InputManager.GuiHolder.set(guiManager);
 |---|---|
 | PlaceholderAPI | `enabled = false`，`set()` 原样返回输入 |
 | Vault | `economy = null`，`isReady()` 为 false，涉及金钱的动作报"余额不足" |
-| `playerMenu` 指令声明 | 记 SEVERE，指令不可用，其余功能正常 |
+| `exmenu` 指令声明 | 记 SEVERE，指令不可用，其余功能正常 |
 
 > 降级是刻意的：菜单插件不该因为没装经济插件就无法启动。
 
@@ -313,7 +313,7 @@ InputManager.GuiHolder.set(guiManager);
 键是菜单文件名（**含 `.yml`**）。
 
 **`MenuConfig.reload()` 不会清这个缓存** —— 它属于渲染层，配置层不应反向依赖。
-所以 `/plm reload` 必须显式清理：
+所以 `/exmenu reload` 必须显式清理：
 
 ```java
 MenuConfig config = configProvider.get();
@@ -324,13 +324,13 @@ if (guiManager != null) {
 ```
 
 > 这是曾经**真实存在的缺陷**：`reloadPluginConfig()` 是唯一会清缓存的方法，
-> 但它是死代码，`/plm reload` 直接调 `reload()` 绕过了它。
+> 但它是死代码，`/exmenu reload` 直接调 `reload()` 绕过了它。
 > 现在 `handleReload` 已改为显式调用 `invalidateCache()`。
 
 ### 5.4 storage.yml 不可热重载
 
 连接池一旦建立，切换方言会让已缓存的 `PreparedStatement` 失效。
-因此改 `storage.yml` **必须重启服务器**，`/plm reload` 对它无效。
+因此改 `storage.yml` **必须重启服务器**，`/exmenu reload` 对它无效。
 
 ---
 
@@ -354,7 +354,7 @@ if (guiManager != null) {
 | 10 | 有 `pane` 则填充背景 | — |
 | 11 | `gui.show(player)` | — |
 
-管理员预览（`/plm view`、`adminOpen`）在第 3、4 步**绕过**权限与世界校验。
+管理员预览（`/exmenu view`、`adminOpen`）在第 3、4 步**绕过**权限与世界校验。
 
 ### 6.2 批量查询（避免 N+1）
 
@@ -762,7 +762,7 @@ GSON.toJson(item.serialize())
 ### 11.5 物品去重
 
 物品按 `item_md5`（序列化 JSON 的 MD5）去重，唯一键在数据库层保证。
-`/plm item` 存入前先 `findIdByMd5`，命中则返回已有 id。
+`/exmenu item` 存入前先 `findIdByMd5`，命中则返回已有 id。
 
 ---
 
@@ -823,7 +823,7 @@ Class.forName("io.papermc.paper.threadedregions.RegionizedServer")
 **① 注册权限**（`PERMISSIONS`，第 53–66 行）
 
 ```java
-PERMISSIONS.put("myCommand", "playerMenu.myCommand");
+PERMISSIONS.put("myCommand", "exmenu.myCommand");
 ```
 
 > 这里的键用 **camelCase**（如 `addItem`）。
@@ -851,7 +851,7 @@ case "mycommand":            // ← 注意：这里必须全小写
 > ⚠️ **大小写陷阱（已修复，但新加时仍要注意）**：
 > `sub` 是 `args[0].toLowerCase()` 的结果，所以**必须用小写字面量比较**。
 > 这两处曾写成 `"adminOpen"` / `"addItem"` / `"getItem"`，
-> 与已小写的值**永远不相等** → `/plm adminOpen <TAB>` 不给任何菜单名建议。
+> 与已小写的值**永远不相等** → `/exmenu adminOpen <TAB>` 不给任何菜单名建议。
 > 已改为 `"adminopen"` / `"additem"` / `"getitem"`。
 
 > 另外注意：`onCommand` 对**未知子指令**返回的是 `noCommandPermission`
@@ -1021,7 +1021,7 @@ gui.show(player);
 | `shopType: buy` / `sell` | 只支持 `leftBuyRightSell` / `leftSellRightBuy` |
 | 更新检查 | `isCheckUpdate` 无实现 |
 | `EconomyUtil` | 只支持 Vault |
-| 图形化创建 / 编辑菜单 | 未实现，`/plm create` 只写骨架文件 |
+| 图形化创建 / 编辑菜单 | 未实现，`/exmenu create` 只写骨架文件 |
 
 ### 14.2 无渲染效果的按钮字段
 
@@ -1093,7 +1093,7 @@ gui.show(player);
 |---|---|
 | `action.*` 用 `getBoolean()` 读，而配置写的是 `ALL` | **开箱即用时冷却、次数限制、经济动作全部被静默禁用** |
 | `[opPerformCommand]` 缺 `case` 分支 | 落到 `default` → 报错并**中断整条动作链** |
-| `/plm reload` 不丢弃按钮缓存 | 重载后玩家仍看到旧按钮 |
+| `/exmenu reload` 不丢弃按钮缓存 | 重载后玩家仍看到旧按钮 |
 | `GuiContext` 构造时传入 null plugin | `runTask(null, …)` 抛 NPE |
 | `onTabComplete` 用 camelCase 比较已小写的值 | `adminOpen` / `addItem` / `getItem` 的菜单名补全**永远不触发** |
 | 示例菜单使用不存在的 `[actionbar]` 标签 | 中断该按钮的动作链 |
@@ -1173,7 +1173,7 @@ gui.show(player);
 | **限制记录** | `menu_limit` 表中的一行，记某玩家在某按钮上的次数与时间 |
 | **准入检查** | 点击后、执行前的五关校验 |
 | **渲染快照** | `open()` 时一次性查出的 limit 与物品数据 |
-| **管理员预览** | `/plm view` / `adminOpen` 时绕过权限与世界的标记，10 秒过期 |
+| **管理员预览** | `/exmenu view` / `adminOpen` 时绕过权限与世界的标记，10 秒过期 |
 
 ---
 

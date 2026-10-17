@@ -22,4 +22,4 @@ mysql:
   max-lifetime: 1800000
   keepalive-time: 300000
 
-# 注意：修改本文件后需要重启服务器，/plm reload 不会切换存储后端
+# 注意：修改本文件后需要重启服务器，/exmenu reload 不会切换存储后端

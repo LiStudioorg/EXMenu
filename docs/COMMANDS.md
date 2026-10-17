@@ -1,6 +1,6 @@
-# PlayerMenuNG 指令与权限文档
+# EXMenu 指令与权限文档
 
-> 面向**服主 / 管理员**。说明 **PlayerMenuNG**（`newgen` 模块）的全部指令与权限节点。
+> 面向**服主 / 管理员**。说明 **EXMenu**（`newgen` 模块）的全部指令与权限节点。
 >
 > 配置说明见 [配置文档](CONFIGURATION.md)，开发说明见 [开发文档](DEVELOPMENT.md)。
 
@@ -21,30 +21,30 @@
 
 ## 1. 指令总览
 
-主指令 `/playerMenu`，别名 **`/plm`**。
+主指令 `/exmenu`（无别名）。
 
 **参数约定**：`args[0]` 永远是子指令名，用户参数从 `args[1]` 开始。
 
 | 子指令 | 语法 | 权限 | 默认 |
 |---|---|---|---|
-| `open` | `/plm open <菜单> [玩家]` | `playerMenu.open` | **所有人** |
-| `close` | `/plm close` | `playerMenu.close` | **所有人** |
-| `clock` | `/plm clock` | `playerMenu.clock` | **所有人** |
-| `reload` | `/plm reload` | `playerMenu.reload` | OP |
-| `create` | `/plm create <菜单>` | `playerMenu.create` | OP |
-| `view` | `/plm view <菜单>` | `playerMenu.view` | OP |
-| `item` | `/plm item <槽位>` | `playerMenu.item` | OP |
-| `addItem` | `/plm addItem <菜单> <按钮id> <槽位>` | `playerMenu.addItem` | OP |
-| `getItem` | `/plm getItem <id> [数量] [玩家]` | `playerMenu.getItem` | OP |
-| `getMaterial` | `/plm getMaterial` | `playerMenu.getMaterial` | OP |
-| `clear` | `/plm clear <菜单\|all> [玩家]` | `playerMenu.clear` | OP |
-| `convert` | `/plm convert` | `playerMenu.convert` | OP |
-| `adminOpen` | `/plm adminOpen <菜单> [玩家]` | `playerMenu.adminOpen` | OP |
-| `check` | `/plm check [菜单]` | `playerMenu.check` | OP |
+| `open` | `/exmenu open <菜单> [玩家]` | `exmenu.open` | **所有人** |
+| `close` | `/exmenu close` | `exmenu.close` | **所有人** |
+| `clock` | `/exmenu clock` | `exmenu.clock` | **所有人** |
+| `reload` | `/exmenu reload` | `exmenu.reload` | OP |
+| `create` | `/exmenu create <菜单>` | `exmenu.create` | OP |
+| `view` | `/exmenu view <菜单>` | `exmenu.view` | OP |
+| `item` | `/exmenu item <槽位>` | `exmenu.item` | OP |
+| `addItem` | `/exmenu addItem <菜单> <按钮id> <槽位>` | `exmenu.addItem` | OP |
+| `getItem` | `/exmenu getItem <id> [数量] [玩家]` | `exmenu.getItem` | OP |
+| `getMaterial` | `/exmenu getMaterial` | `exmenu.getMaterial` | OP |
+| `clear` | `/exmenu clear <菜单\|all> [玩家]` | `exmenu.clear` | OP |
+| `convert` | `/exmenu convert` | `exmenu.convert` | OP |
+| `adminOpen` | `/exmenu adminOpen <菜单> [玩家]` | `exmenu.adminOpen` | OP |
+| `check` | `/exmenu check [菜单]` | `exmenu.check` | OP |
 
 共 **14 个子指令**。
 
-**`/plm` 无参数**时显示帮助，**不需要任何权限** —— 这样普通玩家打 `/plm`
+**`/exmenu` 无参数**时显示帮助，**不需要任何权限** —— 这样普通玩家打 `/exmenu`
 能看到"你没权限"，而不是"未知命令"，反而更好排查。
 
 子指令名**大小写不敏感**（内部统一转小写比较）。
@@ -53,29 +53,29 @@
 
 ## 2. 权限节点
 
-全部权限节点统一为 `playerMenu.<子指令>`。
+全部权限节点统一为 `exmenu.<子指令>`。
 
 | 权限节点 | 说明 | 默认 |
 |---|---|---|
-| `playerMenu.*` | 全部权限（父节点） | op |
-| `playerMenu.open` | 打开菜单 | **true** |
-| `playerMenu.close` | 关闭菜单 | **true** |
-| `playerMenu.clock` | 取回菜单时钟 | **true** |
-| `playerMenu.reload` | 重载配置 | op |
-| `playerMenu.create` | 创建菜单 | op |
-| `playerMenu.view` | 预览菜单 | op |
-| `playerMenu.item` | 存入物品库 | op |
-| `playerMenu.addItem` | 设置按钮图标 | op |
-| `playerMenu.getItem` | 取出物品库物品 | op |
-| `playerMenu.getMaterial` | 获取材质名 | op |
-| `playerMenu.clear` | 清理限制数据 | op |
-| `playerMenu.convert` | 数据迁移 | op |
-| `playerMenu.adminOpen` | 管理员打开菜单 | op |
-| `playerMenu.check` | 校验菜单配置 | op |
+| `exmenu.*` | 全部权限（父节点） | op |
+| `exmenu.open` | 打开菜单 | **true** |
+| `exmenu.close` | 关闭菜单 | **true** |
+| `exmenu.clock` | 取回菜单时钟 | **true** |
+| `exmenu.reload` | 重载配置 | op |
+| `exmenu.create` | 创建菜单 | op |
+| `exmenu.view` | 预览菜单 | op |
+| `exmenu.item` | 存入物品库 | op |
+| `exmenu.addItem` | 设置按钮图标 | op |
+| `exmenu.getItem` | 取出物品库物品 | op |
+| `exmenu.getMaterial` | 获取材质名 | op |
+| `exmenu.clear` | 清理限制数据 | op |
+| `exmenu.convert` | 数据迁移 | op |
+| `exmenu.adminOpen` | 管理员打开菜单 | op |
+| `exmenu.check` | 校验菜单配置 | op |
 
 ### 2.1 通配符
 
-`playerMenu.*` 视为拥有**全部**权限，等同于同时持有一切子节点。
+`exmenu.*` 视为拥有**全部**权限，等同于同时持有一切子节点。
 
 ### 2.2 控制台
 
@@ -87,7 +87,7 @@
 
 ```yaml
 # menu/vip.yml
-permission: 'playerMenu.open.vip'
+permission: 'exmenu.open.vip'
 ```
 
 留空或不写表示**无需权限**。
@@ -103,7 +103,7 @@ permission: 'playerMenu.open.vip'
   notPermission: 'group.vip'    # 命中则隐藏
 ```
 
-> ⚠️ **切勿**把 `playerMenu.*` 整体授予普通玩家 —— 其中包含 `item`、`addItem`
+> ⚠️ **切勿**把 `exmenu.*` 整体授予普通玩家 —— 其中包含 `item`、`addItem`
 > 等可修改物品库与服务端文件的管理指令。
 
 ### 2.5 权限插件提示
@@ -112,27 +112,27 @@ permission: 'playerMenu.open.vip'
 **OP 不一定自动获得权限**。建议显式授予：
 
 ```
-/lp group admin permission set playerMenu.* true
-/lp group default permission set playerMenu.open true
-/lp group default permission set playerMenu.close true
-/lp group default permission set playerMenu.clock true
+/lp group admin permission set exmenu.* true
+/lp group default permission set exmenu.open true
+/lp group default permission set exmenu.close true
+/lp group default permission set exmenu.clock true
 ```
 
 ---
 
 ## 3. 玩家指令
 
-### `/plm open <菜单> [玩家]`
+### `/exmenu open <菜单> [玩家]`
 
 打开菜单。
 
-- **权限**：`playerMenu.open`
-- **可选形态**：带玩家参数时，**需要额外持有 `playerMenu.adminOpen`**，用于替其他玩家打开。
+- **权限**：`exmenu.open`
+- **可选形态**：带玩家参数时，**需要额外持有 `exmenu.adminOpen`**，用于替其他玩家打开。
 
 ```
-/plm open example.yml
-/plm open example          # .yml 可省略
-/plm open example Steve    # 替 Steve 打开（需 adminOpen 权限）
+/exmenu open example.yml
+/exmenu open example          # .yml 可省略
+/exmenu open example Steve    # 替 Steve 打开（需 adminOpen 权限）
 ```
 
 菜单名**大小写不敏感**，`.yml` 后缀可省略。
@@ -140,18 +140,18 @@ permission: 'playerMenu.open.vip'
 失败提示：`noMenu`（菜单不存在）、`playerNotOnline`（目标玩家不在线）、
 `noPermission`（目标玩家无权限）。
 
-### `/plm close`
+### `/exmenu close`
 
 关闭当前打开的界面。
 
-- **权限**：`playerMenu.close`
+- **权限**：`exmenu.close`
 - 给"菜单卡住了"的玩家一个自救出口。
 
-### `/plm clock`
+### `/exmenu clock`
 
 取回时钟物品。
 
-- **权限**：`playerMenu.clock`
+- **权限**：`exmenu.clock`
 - 需要 `config.yml` 的 `clock.enable: true`，否则提示 `clockFailureMsg`。
 - 物品放在 `clock.slot` 指定的槽位；**该槽位已有物品时改为放进背包**。
 
@@ -159,26 +159,26 @@ permission: 'playerMenu.open.vip'
 
 ## 4. 管理员指令
 
-### `/plm reload`
+### `/exmenu reload`
 
 重载配置。
 
-- **权限**：`playerMenu.reload`
+- **权限**：`exmenu.reload`
 - 重载 `config.yml`、语言文件、`menu/` 下全部菜单、`gui/` 两个界面配置。
 - **同时丢弃按钮缓存**（只刷新配置而不丢缓存，玩家会一直看到旧按钮）。
 - ⚠️ **不会重载 `storage.yml`** —— 改数据库配置需**重启服务器**。
 
 失败提示：`reloadFailureMsg`。
 
-### `/plm create <菜单>`
+### `/exmenu create <菜单>`
 
 创建菜单文件。
 
-- **权限**：`playerMenu.create`
+- **权限**：`exmenu.create`
 - 生成一份**可直接使用的骨架**（标题、`size: 27`、一个示例按钮），而不是空文件。
 
 ```
-/plm create shop
+/exmenu create shop
 ```
 
 - 菜单名会自动补 `.yml`。
@@ -186,35 +186,35 @@ permission: 'playerMenu.open.vip'
 - 菜单名带 `../` 等**路径穿越写法会被拒绝**。
 - 创建后会自动重新加载菜单列表，立即可用。
 
-### `/plm view <菜单>`
+### `/exmenu view <菜单>`
 
 以管理员视角预览菜单。
 
-- **权限**：`playerMenu.view`
+- **权限**：`exmenu.view`
 - **跳过限制检查**（冷却、限购），其余渲染逻辑保持一致。
 - 用于检查按钮的实际显示效果。
 
-### `/plm item <槽位>`
+### `/exmenu item <槽位>`
 
 把物品栏指定槽位的物品存进物品库。
 
-- **权限**：`playerMenu.item`
+- **权限**：`exmenu.item`
 - 物品按**序列化内容的 MD5 去重**；已存在时直接返回既有 id，不重复存储。
 
 ```
-/plm item 0
+/exmenu item 0
 ```
 
 返回：`已存入物品库, id: <id>` 或 `该物品已存在, id: <id>`。
 
-### `/plm addItem <菜单> <按钮id> <槽位>`
+### `/exmenu addItem <菜单> <按钮id> <槽位>`
 
 把手持物品设为某个按钮的图标。
 
-- **权限**：`playerMenu.addItem`
+- **权限**：`exmenu.addItem`
 
 ```
-/plm addItem shop -1 14
+/exmenu addItem shop -1 14
 ```
 
 它会：
@@ -227,80 +227,80 @@ permission: 'playerMenu.open.vip'
 > ⚠️ 这里的 `<按钮id>` 是**按钮原有的 `id` 字段值**（通常为负数），
 > 用于定位按钮；执行后它会被**替换成物品库 id**。
 
-### `/plm getItem <id> [数量] [玩家]`
+### `/exmenu getItem <id> [数量] [玩家]`
 
 从物品库取出物品。
 
-- **权限**：`playerMenu.getItem`
+- **权限**：`exmenu.getItem`
 - 数量默认 `1`，玩家默认自己。
-- **为他人发放需要额外持有 `playerMenu.adminOpen`**。
+- **为他人发放需要额外持有 `exmenu.adminOpen`**。
 
 ```
-/plm getItem 1
-/plm getItem 1 64
-/plm getItem 1 64 Steve
+/exmenu getItem 1
+/exmenu getItem 1 64
+/exmenu getItem 1 64 Steve
 ```
 
 > 💡 参数解析器会**先判断第三个参数能否当作数字**，所以
-> `/plm getItem 5 Steve` 也能正确理解为"给 Steve 发 5 号物品"，
+> `/exmenu getItem 5 Steve` 也能正确理解为"给 Steve 发 5 号物品"，
 > 不会把 `Steve` 当成数量。
 
-### `/plm getMaterial`
+### `/exmenu getMaterial`
 
 获取手持物品的材质名。
 
-- **权限**：`playerMenu.getMaterial`
+- **权限**：`exmenu.getMaterial`
 - 用于确认 `material` / `openItem` / `shopMaterial` 该填什么。
 - 输出纯文本，方便复制。
 
-### `/plm clear <菜单|all> [玩家]`
+### `/exmenu clear <菜单|all> [玩家]`
 
 清理限制记录（冷却与限购）。
 
-- **权限**：`playerMenu.clear`
+- **权限**：`exmenu.clear`
 
 ```
-/plm clear shop            # 清理 shop.yml 里所有按钮的限制记录
-/plm clear all             # 清理全部限制记录
-/plm clear shop Steve      # 只清理 Steve 在 shop.yml 上的记录
-/plm clear all Steve       # 只清理 Steve 的全部记录
+/exmenu clear shop            # 清理 shop.yml 里所有按钮的限制记录
+/exmenu clear all             # 清理全部限制记录
+/exmenu clear shop Steve      # 只清理 Steve 在 shop.yml 上的记录
+/exmenu clear all Steve       # 只清理 Steve 的全部记录
 ```
 
 工作方式：扫描菜单里所有 `buttons` 的 `id`，清理这些 id 的限制记录
 （**含负数 id**，它们同样是限制标识）。
 
-### `/plm convert`
+### `/exmenu convert`
 
 数据迁移说明。
 
-- **权限**：`playerMenu.convert`
+- **权限**：`exmenu.convert`
 - 当前实现只输出**迁移指引**（需要重启服务器后执行，且不清理源数据库）。
 - 提示把旧库的 `player_menu` 表导出为 SQL，再用数据库工具导入 `menu_item` 表。
 
 > ⚠️ **这不是自动迁移工具** —— 请务必先备份数据库。
 
-### `/plm adminOpen <菜单> [玩家]`
+### `/exmenu adminOpen <菜单> [玩家]`
 
 管理员强制打开菜单。
 
-- **权限**：`playerMenu.adminOpen`
-- **跳过限制检查**，与 `/plm view` 类似但可指定目标玩家。
+- **权限**：`exmenu.adminOpen`
+- **跳过限制检查**，与 `/exmenu view` 类似但可指定目标玩家。
 
 ```
-/plm adminOpen shop
-/plm adminOpen shop Steve
+/exmenu adminOpen shop
+/exmenu adminOpen shop Steve
 ```
 
-### `/plm check [菜单]`
+### `/exmenu check [菜单]`
 
 **校验菜单配置。**
 
-- **权限**：`playerMenu.check`
+- **权限**：`exmenu.check`
 - 不带参数时校验全部菜单。
 
 ```
-/plm check
-/plm check shop
+/exmenu check
+/exmenu check shop
 ```
 
 检查项：
@@ -324,7 +324,7 @@ permission: 'playerMenu.open.vip'
 ```
 
 > 💡 **这是最省事的排错手段。** 上述问题在运行时的表现都是"按钮没反应"，
-> 靠肉眼对着配置猜非常困难。改完菜单后跑一次 `/plm check`。
+> 靠肉眼对着配置猜非常困难。改完菜单后跑一次 `/exmenu check`。
 
 ---
 
@@ -349,9 +349,9 @@ openCommand:
 | **可绑多个** | 一个菜单可绑定多条命令 |
 | **大小写不敏感** | 命令名以小写比较 |
 | **权限沿用菜单的 `permission`** | 动态指令**没有独立的权限节点** |
-| **加载即生效** | 启动与 `/plm reload` 时注册 |
+| **加载即生效** | 启动与 `/exmenu reload` 时注册 |
 
-命令名冲突时行为不可预期，建议使用独特前缀（如 `plmshop`、`servermenu`）。
+命令名冲突时行为不可预期，建议使用独特前缀（如 `exmenushop`、`servermenu`）。
 
 ---
 
@@ -390,13 +390,13 @@ openCommand:
 
 | 现象 | 原因 | 解决 |
 |---|---|---|
-| `/plm` 无任何输出 | 只显示帮助，属正常 | 直接用具体子指令 |
+| `/exmenu` 无任何输出 | 只显示帮助，属正常 | 直接用具体子指令 |
 | 子指令提示"你没有权限使用该命令" | 缺对应权限节点 | 检查权限插件 |
-| 动态指令 `/shop` 没反应 | 未 `/plm reload`，或与其他插件命令冲突 | 重载；改用独特命令名 |
-| `/plm open` 提示菜单不存在 | 文件名不对 | 用 `/plm check` 或看 `menu/` 目录实际文件名 |
-| `/plm getItem` 控制台报错 | 未指定玩家 | 加上玩家参数 |
-| `/plm create` 提示菜单已存在 | 同名文件已存在 | 换个名字或手动编辑 |
-| `/plm create` 提示菜单名非法 | 含 `../` 等路径穿越写法 | 用普通文件名 |
+| 动态指令 `/shop` 没反应 | 未 `/exmenu reload`，或与其他插件命令冲突 | 重载；改用独特命令名 |
+| `/exmenu open` 提示菜单不存在 | 文件名不对 | 用 `/exmenu check` 或看 `menu/` 目录实际文件名 |
+| `/exmenu getItem` 控制台报错 | 未指定玩家 | 加上玩家参数 |
+| `/exmenu create` 提示菜单已存在 | 同名文件已存在 | 换个名字或手动编辑 |
+| `/exmenu create` 提示菜单名非法 | 含 `../` 等路径穿越写法 | 用普通文件名 |
 
 ### 8.2 权限相关
 
@@ -404,14 +404,14 @@ openCommand:
 |---|---|---|
 | OP 也无法执行 | 权限插件接管了 `default: op` | 用 `/lp` 显式授予 |
 | 玩家能看到不该看的按钮 | 按钮未配 `permission` | 给按钮加 `permission` |
-| 玩家能修改菜单文件 | 错误授予了 `playerMenu.*` 或 `addItem` | 收紧权限 |
+| 玩家能修改菜单文件 | 错误授予了 `exmenu.*` 或 `addItem` | 收紧权限 |
 
 ### 8.3 排错流程
 
-1. **改完配置先 `/plm reload`** —— 忘了这步是最常见的原因。
-2. **跑 `/plm check`** —— 它会指出标签错误、空行、id 重复、槽位越界。
-3. **确认菜单名** —— `/plm check` 列出的就是实际加载到的菜单。
-4. **确认权限节点拼写** —— `playerMenu.<子指令>`，大小写敏感。
+1. **改完配置先 `/exmenu reload`** —— 忘了这步是最常见的原因。
+2. **跑 `/exmenu check`** —— 它会指出标签错误、空行、id 重复、槽位越界。
+3. **确认菜单名** —— `/exmenu check` 列出的就是实际加载到的菜单。
+4. **确认权限节点拼写** —— `exmenu.<子指令>`，大小写敏感。
 
 ---
 

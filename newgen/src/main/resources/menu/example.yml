@@ -1,5 +1,5 @@
 # 示例菜单。
-# 首次启动时本文件会被释放到 plugins/PlayerMenuNG/menu/ 下。
+# 首次启动时本文件会被释放到 plugins/EXMenu/menu/ 下。
 
 # 界面标题
 title: '&8菜单 - 示例'
