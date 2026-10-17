@@ -22,7 +22,7 @@ EXMenu 是 PlayerMenu v1.11.0 的**重写实现**：保持 YAML 配置语义与�
 | 存储 | HandyLib `Db` 链式 API | **原生 JDBC + HikariCP** |
 | 源码规模 | 61 文件 / 211 KB | 35 文件 / 325 KB（含更多注释） |
 
-**产物**：`newgen/target/EXMenu-1.0.0.jar`（约 16 MB，已 shade 并重定位）。
+**产物**：`newgen/target/EXMenu-1.1.0.jar`（约 16 MB，已 shade 并重定位）。
 
 ---
 
@@ -584,7 +584,7 @@ cd newgen
 mvn clean package
 ```
 
-产物：`newgen/target/EXMenu-1.0.0.jar`
+产物：`newgen/target/EXMenu-1.1.0.jar`
 
 - 依赖全部来自公开仓库（papermc / codemc / spigot / extendedclip / jitpack）
 - **无需任何私有仓库凭据**

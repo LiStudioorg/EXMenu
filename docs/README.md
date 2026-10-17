@@ -27,7 +27,7 @@
 
 ### 1. 安装
 
-把 `EXMenu-1.0.0.jar` 放入 `plugins/` 目录，重启服务器。
+把 `EXMenu-1.1.0.jar` 放入 `plugins/` 目录，重启服务器。
 
 **可选依赖**（按需安装）：
 
@@ -130,7 +130,7 @@ mvn clean package
 cd newgen && mvn clean package
 ```
 
-产物：`newgen/target/EXMenu-1.0.0.jar`
+产物：`newgen/target/EXMenu-1.1.0.jar`
 
 - 依赖全部来自**公开 Maven 仓库**，无需任何私有仓库凭据
 - 目标字节码为 **Java 17**，支持 **Spigot 与 Folia**

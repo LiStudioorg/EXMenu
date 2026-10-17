@@ -43,7 +43,7 @@ EXMenu 是一个 **YAML 驱动**的 Minecraft 箱子菜单插件。服主写 YAM
 | 资源 | `newgen/src/main/resources/`（9 个 YAML） |
 | 字节码 | Java 17 |
 | 构建 | Maven（根 pom 为聚合 pom） |
-| 产物 | `newgen/target/EXMenu-1.0.0.jar`（约 16.4 MB） |
+| 产物 | `newgen/target/EXMenu-1.1.0.jar`（约 16.4 MB） |
 | 目标平台 | Spigot 与 Folia |
 | 指令 | `/exmenu`（无别名） |
 
