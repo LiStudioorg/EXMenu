@@ -220,29 +220,6 @@ public final class MenuChecker {
     }
 
     /**
-     * 限制记录的只读视图。
-     *
-     * <p>渲染层需要一次性拿到某玩家的全部记录，但又不想依赖具体的 DAO 实现，
-     * 因此抽出这个最小接口。
-     */
-    public interface LimitView {
-        /**
-         * 取某按钮的记录。
-         *
-         * @param menuItemId 按钮 id
-         * @return 记录，可为 null
-         */
-        MenuLimit get(Integer menuItemId);
-
-        /**
-         * 全部记录的映射。
-         *
-         * @return 以按钮 id 为键的映射
-         */
-        Map<Integer, MenuLimit> all();
-    }
-
-    /**
      * 配置访问的最小接口。
      *
      * <p>检查器只需要四个开关，不希望依赖整个 {@code MenuConfig}。

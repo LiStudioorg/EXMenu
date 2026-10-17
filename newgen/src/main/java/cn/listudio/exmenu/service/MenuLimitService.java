@@ -308,10 +308,16 @@ public final class MenuLimitService {
     }
 
     /**
+     * 单条 {@code IN} 查询允许的最大参数个数（SQLite 变量上限 999，留余量）。
+     */
+    private static final int IN_CLAUSE_LIMIT = 500;
+
+    /**
      * 批量清空若干按钮的限制记录（不区分玩家）。
      *
      * <p>给 {@code /exmenu clear <菜单>} 用：一个菜单的所有按钮应当一次性重置，
-     * 逐条调用 {@link #reset} 会产生 N 次连接往返，因此改用单条 {@code IN} 语句。
+     * 逐条调用 {@link #reset} 会产生 N 次连接往返，因此改用单条 {@code IN} 语句；
+     * id 超过 {@link #IN_CLAUSE_LIMIT} 时自动分片。
      *
      * @param menuItemIds 按钮 id 列表；为 null 或空时不执行任何操作
      * @return 删除的行数；失败返回 -1
@@ -320,15 +326,22 @@ public final class MenuLimitService {
         if (menuItemIds == null || menuItemIds.isEmpty()) {
             return 0;
         }
-        String sql = "DELETE FROM menu_limit WHERE menu_item_id IN (" + placeholders(menuItemIds.size()) + ")";
-        try (Connection connection = storage.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-            bindIds(statement, menuItemIds, 1);
-            return statement.executeUpdate();
-        } catch (SQLException e) {
-            logger.log(Level.WARNING, "批量清空限制记录失败", e);
-            return -1;
+        int deleted = 0;
+        for (int from = 0; from < menuItemIds.size(); from += IN_CLAUSE_LIMIT) {
+            List<Integer> chunk = menuItemIds.subList(from,
+                    Math.min(menuItemIds.size(), from + IN_CLAUSE_LIMIT));
+            String sql = "DELETE FROM menu_limit WHERE menu_item_id IN ("
+                    + placeholders(chunk.size()) + ")";
+            try (Connection connection = storage.getConnection();
+                 PreparedStatement statement = connection.prepareStatement(sql)) {
+                bindIds(statement, chunk, 1);
+                deleted += statement.executeUpdate();
+            } catch (SQLException e) {
+                logger.log(Level.WARNING, "批量清空限制记录失败", e);
+                return -1;
+            }
         }
+        return deleted;
     }
 
     /**
@@ -336,6 +349,7 @@ public final class MenuLimitService {
      *
      * <p>{@code menuItemIds} 为 null 时退化为清空该玩家的全部记录，
      * 这样 {@code /exmenu clear all <玩家>} 不必再单独走一条分支。
+     * id 超过 {@link #IN_CLAUSE_LIMIT} 时自动分片。
      *
      * @param playerUuid  玩家 UUID
      * @param menuItemIds 按钮 id 列表；null 表示该玩家的全部记录
@@ -346,21 +360,35 @@ public final class MenuLimitService {
             return 0;
         }
         boolean all = menuItemIds == null || menuItemIds.isEmpty();
-        String sql = all
-                ? "DELETE FROM menu_limit WHERE player_uuid = ?"
-                : "DELETE FROM menu_limit WHERE player_uuid = ? AND menu_item_id IN ("
-                        + placeholders(menuItemIds.size()) + ")";
-        try (Connection connection = storage.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setString(1, playerUuid.toString());
-            if (!all) {
-                bindIds(statement, menuItemIds, 2);
+        if (all) {
+            String sql = "DELETE FROM menu_limit WHERE player_uuid = ?";
+            try (Connection connection = storage.getConnection();
+                 PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setString(1, playerUuid.toString());
+                return statement.executeUpdate();
+            } catch (SQLException e) {
+                logger.log(Level.WARNING, "批量重置限制记录失败: uuid=" + playerUuid, e);
+                return -1;
             }
-            return statement.executeUpdate();
-        } catch (SQLException e) {
-            logger.log(Level.WARNING, "批量重置限制记录失败: uuid=" + playerUuid, e);
-            return -1;
         }
+
+        int deleted = 0;
+        for (int from = 0; from < menuItemIds.size(); from += IN_CLAUSE_LIMIT) {
+            List<Integer> chunk = menuItemIds.subList(from,
+                    Math.min(menuItemIds.size(), from + IN_CLAUSE_LIMIT));
+            String sql = "DELETE FROM menu_limit WHERE player_uuid = ? AND menu_item_id IN ("
+                    + placeholders(chunk.size()) + ")";
+            try (Connection connection = storage.getConnection();
+                 PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setString(1, playerUuid.toString());
+                bindIds(statement, chunk, 2);
+                deleted += statement.executeUpdate();
+            } catch (SQLException e) {
+                logger.log(Level.WARNING, "批量重置限制记录失败: uuid=" + playerUuid, e);
+                return -1;
+            }
+        }
+        return deleted;
     }
 
     /**

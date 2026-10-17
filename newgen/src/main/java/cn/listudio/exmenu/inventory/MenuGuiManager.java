@@ -11,6 +11,7 @@ import cn.listudio.exmenu.service.MenuLimitService;
 import cn.listudio.exmenu.util.ItemStackUtil;
 import cn.listudio.exmenu.util.LangUtil;
 import cn.listudio.exmenu.util.PlaceholderUtil;
+import cn.listudio.exmenu.util.SchedulerUtil;
 import cn.listudio.exmenu.util.TextUtil;
 import com.github.stefvanschie.inventoryframework.gui.GuiItem;
 import com.github.stefvanschie.inventoryframework.gui.type.ChestGui;
@@ -62,8 +63,11 @@ public final class MenuGuiManager implements MenuExecutor.GuiOpener, ConfigProvi
     /** 执行器，渲染时注入到点击回调里。 */
     private final MenuExecutor executor;
 
+    /** 限制缓存（可选注入）：原子占位写库后失效，保证 PAPI 状态变量即时回显。 */
+    private cn.listudio.exmenu.core.LimitCache limitCache;
+
     /** 按钮缓存：菜单文件名 → 按钮列表。配置不改就一直是同一份对象。 */
-    private final Map<String, List<MenuButtonParam>> buttonCache = new HashMap<>();
+    private final Map<String, List<MenuButtonParam>> buttonCache = new java.util.concurrent.ConcurrentHashMap<>();
 
     /**
      * 构造界面管理器。
@@ -98,6 +102,27 @@ public final class MenuGuiManager implements MenuExecutor.GuiOpener, ConfigProvi
      */
     public void invalidateCache() {
         buttonCache.clear();
+    }
+
+    /**
+     * 注入限制缓存。
+     *
+     * @param limitCache 限制缓存
+     */
+    public void setLimitCache(cn.listudio.exmenu.core.LimitCache limitCache) {
+        this.limitCache = limitCache;
+    }
+
+    /**
+     * 丢弃单个菜单的按钮缓存。
+     *
+     * <p>可视化编辑器每改一个按钮就保存一次，只需让被改的菜单失效，
+     * 全量清空会让其他菜单在下次打开时白白重新解析。
+     *
+     * @param menuFile 菜单文件名（含 .yml）
+     */
+    public void invalidateCache(String menuFile) {
+        buttonCache.remove(menuFile);
     }
 
     /**
@@ -153,9 +178,14 @@ public final class MenuGuiManager implements MenuExecutor.GuiOpener, ConfigProvi
     /**
      * 打开一个菜单。
      *
+     * <p><b>线程编排</b>：检查与按钮解析（纯内存）在当前线程完成；两次批量查库
+     * 移到异步线程；界面构建与显示回到玩家所在线程 —— 这既满足"数据库操作
+     * 不得阻塞游戏线程"的硬规则，也满足"IFramework 非线程安全、必须在实体线程
+     * 构建"的要求。返回值表示<b>检查是否通过</b>，界面在之后一拍的实体任务里出现。
+     *
      * @param player   玩家
      * @param menuName 菜单文件名
-     * @return true 表示成功打开
+     * @return true 表示检查通过、界面已排入渲染队列
      */
     @Override
     public boolean open(Player player, String menuName) {
@@ -186,46 +216,66 @@ public final class MenuGuiManager implements MenuExecutor.GuiOpener, ConfigProvi
 
         List<MenuButtonParam> buttons = parseButtons(menuFile, menu);
 
-        // ---- 批量取数据：两次查询解决全部按钮 ----
-        Map<Integer, cn.listudio.exmenu.enter.MenuItem> itemLibrary = loadItemLibrary(buttons);
-        Map<Integer, MenuLimit> limits = limitService.findMapByPlayerUuid(player.getUniqueId());
-
-        StaticPane pane = new StaticPane(9, size / 9);
-        // 记录每个槽位当前的优先级，用于解决同槽位冲突
-        Map<Integer, Integer> slotPriority = new HashMap<>();
-
+        // ---- 批量取数据：两次查询移到异步线程，避免主线程阻塞 IO ----
+        List<Integer> libraryIds = new ArrayList<>();
         for (MenuButtonParam param : buttons) {
-            if (!passesPermission(player, param)) {
-                continue;
-            }
-            if (shouldHide(player, param, limits)) {
-                continue;
-            }
-
-            ItemStack itemStack = buildItem(player, param, itemLibrary, limits);
-            if (itemStack == null) {
-                continue;
-            }
-
-            for (Integer slot : param.getSlots()) {
-                if (slot >= size) {
-                    continue;
-                }
-                // 同槽位冲突：priority 高的胜出，相等则后者覆盖前者
-                Integer existing = slotPriority.get(slot);
-                if (existing != null && existing > param.getPriority()) {
-                    continue;
-                }
-                slotPriority.put(slot, param.getPriority());
-                pane.addItem(createGuiItem(player, param, itemStack, gui, limits), Slot.fromIndex(slot));
+            if (param.getId() > 0) {
+                libraryIds.add(param.getId());
             }
         }
 
-        // 玻璃板背景：只在配置指定时铺，避免覆盖玩家自己的设计
-        applyPane(pane, menu, size, slotPriority);
+        // 渲染级 PAPI 缓存：同一段文本在一次渲染里通常被 material/name/lore
+        // 多路引用，缓存后每个唯一字符串只解析一次
+        final Map<String, String> papiCache = new HashMap<>();
 
-        gui.addPane(Slot.fromIndex(0), pane);
-        gui.show(player);
+        SchedulerUtil.runTaskAsynchronously(plugin, () -> {
+            Map<Integer, cn.listudio.exmenu.enter.MenuItem> itemLibrary =
+                    itemService.findMapByIds(libraryIds);
+            Map<Integer, MenuLimit> limits = limitService.findMapByPlayerUuid(player.getUniqueId());
+
+            SchedulerUtil.runAtEntity(plugin, player, () -> {
+                if (!player.isOnline()) {
+                    return;
+                }
+                StaticPane pane = new StaticPane(9, size / 9);
+                // 记录每个槽位当前的优先级，用于解决同槽位冲突
+                Map<Integer, Integer> slotPriority = new HashMap<>();
+
+                for (MenuButtonParam param : buttons) {
+                    if (!passesPermission(player, param)) {
+                        continue;
+                    }
+                    if (shouldHide(player, param, limits)) {
+                        continue;
+                    }
+
+                    ItemStack itemStack = buildItem(player, param, itemLibrary, limits, papiCache);
+                    if (itemStack == null) {
+                        continue;
+                    }
+
+                    for (Integer slot : param.getSlots()) {
+                        if (slot >= size) {
+                            continue;
+                        }
+                        // 同槽位冲突：priority 高的胜出，相等则后者覆盖前者
+                        Integer existing = slotPriority.get(slot);
+                        if (existing != null && existing > param.getPriority()) {
+                            continue;
+                        }
+                        slotPriority.put(slot, param.getPriority());
+                        pane.addItem(createGuiItem(player, param, itemStack, gui, limits),
+                                Slot.fromIndex(slot));
+                    }
+                }
+
+                // 玻璃板背景：只在配置指定时铺，避免覆盖玩家自己的设计
+                applyPane(pane, menu, size, slotPriority);
+
+                gui.addPane(Slot.fromIndex(0), pane);
+                gui.show(player);
+            });
+        });
         return true;
     }
 
@@ -347,6 +397,11 @@ public final class MenuGuiManager implements MenuExecutor.GuiOpener, ConfigProvi
 
             // ---- 需要输入：保存上下文并关闭界面 ----
             if (TextUtil.isNotEmpty(clickParam.getInput())) {
+                // 铁砧通道：不开聊天等待，直接弹一个铁砧界面收文本
+                if (clickParam.isAnvilInput()) {
+                    AnvilInputManager.begin(plugin, clicker, clickParam, gui, executor);
+                    return;
+                }
                 InputSession session = new InputSession(clickParam, gui);
                 InputManager.begin(clicker, session, config.getInputTimeout());
                 clicker.closeInventory();
@@ -383,7 +438,13 @@ public final class MenuGuiManager implements MenuExecutor.GuiOpener, ConfigProvi
                         return;
                     }
                     clickParam.setNumberClaimed(true);
-                    executor.execute(finalClicker, clickParam, findFreshLimit(finalClicker, clickParam),
+                    if (limitCache != null) {
+                        limitCache.invalidate(finalClicker.getUniqueId());
+                    }
+                    // 不再回查最新限制记录：execute() 内部并不消费 limit 参数
+                    // （校验已前置、写入走原子累加），此前这里在实体线程同步查库
+                    // 既违反"DB 必须异步"的规则，又给每次限购点击多加一次往返。
+                    executor.execute(finalClicker, clickParam, null,
                             wrapFor(finalGui, player, clickParam));
                 });
             });
@@ -530,47 +591,6 @@ public final class MenuGuiManager implements MenuExecutor.GuiOpener, ConfigProvi
     // ------------------------------------------------------------------
 
     /**
-     * 现查一个按钮的限制记录。
-     *
-     * <p><b>为什么不能复用渲染时的快照</b>：渲染快照是在 {@code open()} 时取的，
-     * 之后玩家在同一个界面上反复点击，用快照判断次数会让"限购 5 次"的按钮
-     * 被点任意多次 —— 门读的是打开界面那一刻的旧值，永远看不到自己刚写进去的记录。
-     * 因此点击路径必须重新查一次。
-     *
-     * <p>本方法会访问数据库，调用方须保证处于异步线程或接受这一开销；
-     * 点击事件本身就是异步查库的既有路径。
-     *
-     * @param player 玩家
-     * @param param  按钮
-     * @return 限制记录，{@code id == 0} 或查不到时返回 null
-     */
-    public MenuLimit findFreshLimit(Player player, MenuButtonParam param) {
-        if (player == null || param == null || param.getId() == 0) {
-            return null;
-        }
-        return limitService.find(player.getUniqueId(), param.getId());
-    }
-
-    /**
-     * 批量加载本次渲染用到的物品库条目。
-     *
-     * @param buttons 按钮列表
-     * @return id → 物品库条目
-     */
-    private Map<Integer, cn.listudio.exmenu.enter.MenuItem> loadItemLibrary(List<MenuButtonParam> buttons) {
-        List<Integer> ids = new ArrayList<>();
-        for (MenuButtonParam param : buttons) {
-            if (param.getId() > 0) {
-                ids.add(param.getId());
-            }
-        }
-        if (ids.isEmpty()) {
-            return new HashMap<>();
-        }
-        return itemService.findMapByIds(ids);
-    }
-
-    /**
      * 权限过滤。
      *
      * @param player 玩家
@@ -633,25 +653,27 @@ public final class MenuGuiManager implements MenuExecutor.GuiOpener, ConfigProvi
      * @param param       按钮
      * @param itemLibrary 物品库
      * @param limits      限制记录
+     * @param papiCache   渲染级变量替换缓存（同一次渲染内共享）
      * @return 物品；不应渲染时返回 null
      */
     private ItemStack buildItem(Player player, MenuButtonParam param,
                                 Map<Integer, cn.listudio.exmenu.enter.MenuItem> itemLibrary,
-                                Map<Integer, MenuLimit> limits) {
+                                Map<Integer, MenuLimit> limits,
+                                Map<String, String> papiCache) {
         // ---- 优先从物品库取 ----
         if (param.getId() > 0) {
             cn.listudio.exmenu.enter.MenuItem menuItem = itemLibrary.get(param.getId());
             if (menuItem != null) {
                 ItemStack fromLibrary = ItemStackUtil.deserialize(menuItem.getItemJson());
                 if (fromLibrary != null) {
-                    return applyDynamic(player, param, fromLibrary, limits);
+                    return applyDynamic(player, param, fromLibrary, limits, papiCache);
                 }
             }
             // 物品库里没有：回退到材质渲染，而不是直接消失。
             // 让按钮"看起来不对"比让它"凭空消失"好排查得多。
         }
 
-        String material = PlaceholderUtil.set(player, param.getMaterial());
+        String material = pset(papiCache, player, param.getMaterial());
         if (TextUtil.isEmpty(material)) {
             return null;
         }
@@ -667,7 +689,47 @@ public final class MenuGuiManager implements MenuExecutor.GuiOpener, ConfigProvi
             itemStack = new ItemStack(org.bukkit.Material.AIR);
         }
 
-        return applyDynamic(player, param, itemStack, limits);
+        return applyDynamic(player, param, itemStack, limits, papiCache);
+    }
+
+    /**
+     * 带渲染级缓存的 PAPI 替换。
+     *
+     * <p>只缓存含 {@code %} 的文本 —— 不含变量的字符串在
+     * {@link PlaceholderUtil#set} 里本来就是直接返回，缓存反而多一次哈希查找。
+     *
+     * @param cache  本次渲染的缓存
+     * @param player 玩家
+     * @param text   原始文本
+     * @return 替换后的文本
+     */
+    private static String pset(Map<String, String> cache, Player player, String text) {
+        if (text == null || text.indexOf('%') < 0) {
+            return PlaceholderUtil.set(player, text);
+        }
+        String cached = cache.get(text);
+        if (cached != null) {
+            return cached;
+        }
+        String resolved = PlaceholderUtil.set(player, text);
+        cache.put(text, resolved);
+        return resolved;
+    }
+
+    /**
+     * 带渲染级缓存的 PAPI 替换（列表版）。
+     *
+     * @param cache  本次渲染的缓存
+     * @param player 玩家
+     * @param lines  原始文本列表
+     * @return 替换后的列表，永不返回 null
+     */
+    private static List<String> psetList(Map<String, String> cache, Player player, List<String> lines) {
+        List<String> result = new ArrayList<>();
+        for (String line : lines) {
+            result.add(pset(cache, player, line));
+        }
+        return result;
     }
 
     /**
@@ -680,24 +742,25 @@ public final class MenuGuiManager implements MenuExecutor.GuiOpener, ConfigProvi
      * @param param     按钮
      * @param itemStack 基础物品
      * @param limits    限制记录
+     * @param papiCache 渲染级变量替换缓存
      * @return 处理后的物品
      */
     private ItemStack applyDynamic(Player player, MenuButtonParam param, ItemStack itemStack,
-                                   Map<Integer, MenuLimit> limits) {
+                                   Map<Integer, MenuLimit> limits, Map<String, String> papiCache) {
         // ---- 名称：dynamicName 优先，它允许引用 PAPI ----
         String name = TextUtil.isNotEmpty(param.getDynamicName())
-                ? PlaceholderUtil.set(player, param.getDynamicName())
+                ? pset(papiCache, player, param.getDynamicName())
                 : param.getName();
 
         // ---- 描述：dynamicLore 优先 ----
         List<String> lore = !param.getDynamicLore().isEmpty()
-                ? PlaceholderUtil.set(player, param.getDynamicLore())
+                ? psetList(papiCache, player, param.getDynamicLore())
                 : param.getLore();
 
         // ---- 数量：dynamicAmount 优先，但 0 要回退到配置的 amount ----
         int amount = param.getAmount();
         if (TextUtil.isNotEmpty(param.getDynamicAmount())) {
-            String resolved = PlaceholderUtil.set(player, param.getDynamicAmount());
+            String resolved = pset(papiCache, player, param.getDynamicAmount());
             Double value = TextUtil.evaluate(resolved);
             // 动态数量算出 0 或负数时回退，而不是让物品消失 ——
             // 原版直接设成 0，导致物品数量为 0 时渲染异常
@@ -816,42 +879,12 @@ public final class MenuGuiManager implements MenuExecutor.GuiOpener, ConfigProvi
     }
 
     /**
-     * 为指定玩家重新渲染已打开的界面。
-     *
-     * <p>用于输入完成后刷新界面，让次数/冷却的显示立刻更新。
-     *
-     * @param player 玩家
-     */
-    public void refresh(Player player) {
-        if (player.getOpenInventory().getTopInventory().getHolder() == null) {
-            return;
-        }
-        String title = player.getOpenInventory().getTitle();
-        for (String menuFile : configProvider.get().listMenus()) {
-            YamlConfiguration menu = configProvider.get().getMenu(menuFile);
-            if (menu == null) {
-                continue;
-            }
-            if (title.contains(TextUtil.stripColor(menu.getString("title", "")))) {
-                open(player, menuFile);
-                return;
-            }
-        }
-    }
-
-    /**
-     * 便捷方法：给玩家打开界面并标记为非管理员预览。
-     *
-     * @param player   玩家
-     * @param menuName 菜单名
-     */
-    public void openAsPlayer(Player player, String menuName) {
-        MenuSession.clearAdminView(player);
-        open(player, menuName);
-    }
-
-    /**
      * 便捷方法：以管理员身份预览菜单。
+     *
+     * <p>历史上还有"refresh(Player) 按标题回查菜单重渲染"与"openAsPlayer"两个方法，
+     * 均无任何调用点已删除 —— 输入完成后的界面刷新走各自的收尾逻辑
+     * （{@code InputManager.finish} 与 {@code ConfirmGuiManager}），
+     * 不再依赖"用标题字符串猜菜单"这种脆弱匹配。
      *
      * @param player   玩家
      * @param menuName 菜单名
@@ -891,14 +924,31 @@ public final class MenuGuiManager implements MenuExecutor.GuiOpener, ConfigProvi
     }
 
     /**
-     * 取某个页面的槽位总数。
+     * 按按钮 id 在<b>所有</b>菜单里查找按钮。
      *
-     * @param menuFile 菜单文件名
-     * @return 槽位数；菜单不存在时返回 0
+     * <p>供 PAPI 变量使用（{@code %exmenu_limit_remaining_<id>%} 只带 id，不带菜单名）。
+     * id 约定全局唯一，因此返回第一个命中即可；解析结果走按钮缓存，成本是一次哈希遍历。
+     *
+     * @param id 按钮 id
+     * @return 按钮；不存在时返回 null
      */
-    public int getSize(String menuFile) {
-        YamlConfiguration menu = configProvider.get().getMenu(menuFile);
-        return menu == null ? 0 : normalizeSize(menu.getInt("size", 27));
+    public MenuButtonParam findButtonByGlobalId(int id) {
+        if (id == 0) {
+            return null;
+        }
+        MenuConfig config = configProvider.get();
+        if (config == null) {
+            return null;
+        }
+        for (Map.Entry<String, YamlConfiguration> entry
+                : config.getMenuConfigMap().entrySet()) {
+            for (MenuButtonParam param : parseButtons(entry.getKey(), entry.getValue())) {
+                if (param.getId() == id) {
+                    return param;
+                }
+            }
+        }
+        return null;
     }
 
     /**

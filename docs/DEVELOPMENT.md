@@ -39,13 +39,13 @@ EXMenu 是一个 **YAML 驱动**的 Minecraft 箱子菜单插件。服主写 YAM
 |---|---|
 | 插件名 | `EXMenu` |
 | 主类 | `cn.listudio.exmenu.MenuPlugin` |
-| 源码 | `newgen/src/main/java/cn/handyplus/menu/ng/`（34 个文件，约 7300 行） |
+| 源码 | `newgen/src/main/java/cn/listudio/exmenu/`（42 个文件，约 11.4k 行） |
 | 资源 | `newgen/src/main/resources/`（9 个 YAML） |
 | 字节码 | Java 17 |
 | 构建 | Maven（根 pom 为聚合 pom） |
 | 产物 | `newgen/target/EXMenu-1.1.0.jar`（约 16.4 MB） |
 | 目标平台 | Spigot 与 Folia |
-| 指令 | `/exmenu`（无别名） |
+| 指令 | `/exmenu`（无别名，17 个子指令） |
 
 ### 与旧实现的关系
 
@@ -145,21 +145,27 @@ cn.listudio.exmenu
 ├── MenuPlugin.java              插件入口，负责装配与生命周期
 │
 ├── command/      presentation  指令解析与分发
-├── listener/     presentation  事件监听（聊天输入、时钟物品、退出）
+├── listener/     presentation  事件监听（聊天输入、时钟物品、退出、首次引导）
 │
-├── inventory/    render        菜单渲染、按钮解析、输入会话、确认界面
+├── inventory/    render        菜单渲染、按钮解析、输入会话、确认界面、GUI 工具链
 │   ├── MenuGuiManager          ★ 渲染核心
 │   ├── ButtonParser            YAML → MenuButtonParam
 │   ├── ConfirmGuiManager       二次确认界面
-│   ├── InputManager            聊天输入状态机
+│   ├── InputManager            聊天输入状态机（finish 为两通道共用收尾）
+│   ├── AnvilInputManager    ★  铁砧输入通道
+│   ├── EditGuiManager       ★  可视化菜单编辑器（状态机 + 写盘）
+│   ├── SettingsGuiManager   ★  配置中心界面
+│   ├── ItemLibraryGuiManager★  物品库浏览 / 选取
 │   ├── MenuSession             管理员预览标记
 │   └── ConfigProvider          配置快照接口
 │
 ├── core/         engine        业务规则
 │   ├── MenuChecker             ★ 点击准入（五关）
 │   ├── MenuExecutor            ★ 动作链执行
-│   └── ConditionEvaluator      条件表达式求值
+│   ├── ConditionEvaluator      条件表达式求值
+│   └── LimitCache           ★  PAPI 用只读快照缓存（异步刷新，读取零阻塞）
 │
+├── expansion/    expansion     EXMenu 对外提供的 PAPI 变量 ★
 ├── service/      persistence   业务级数据访问
 │   ├── MenuItemService         物品库
 │   └── MenuLimitService        次数与冷却
@@ -168,7 +174,7 @@ cn.listudio.exmenu
 ├── param/  enter/  model       数据结构
 ├── config/                     配置快照
 ├── constants/                  枚举
-└── util/                       横切工具
+└── util/                       横切工具（新增 ActionBarUtil / YamlPatch ★）
 ```
 
 ### 3.1 依赖方向
@@ -199,30 +205,32 @@ presentation  →  render  →  core  →  persistence  →  model
 | 包 | 文件数 | 职责 |
 |---|---|---|
 | `command` | 1 | 解析 `/exmenu`，权限校验，Tab 补全 |
-| `listener` | 3 | 聊天输入拦截、时钟物品右键、玩家退出清理 |
-| `inventory` | 7 | 渲染与界面交互 |
-| `core` | 3 | 准入检查、动作执行、条件求值 |
+| `listener` | 4 | 聊天输入拦截、时钟物品右键、玩家退出清理、首次启动引导 |
+| `inventory` | 11 | 渲染与界面交互（含编辑器 / 配置中心 / 物品库 / 铁砧输入） |
+| `core` | 4 | 准入检查、动作执行、条件求值、限制缓存 |
+| `expansion` | 1 | 对外 PAPI 变量（PAPI 在位才注册） |
 | `service` | 2 | 物品库与限制的业务封装 |
 | `storage` | 3 | 连接池与建表 |
 | `param`/`enter` | 3 | `MenuButtonParam`、`MenuItem`、`MenuLimit` |
 | `config` | 1 | 配置快照 `MenuConfig` |
-| `constants` | 3 | 动作标签、输入类型、GUI 类型 |
-| `util` | 7 | 文本、物品、调度、经济、PAPI、YAML、语言 |
+| `constants` | 2 | 动作标签（22 个）、输入类型 |
+| `util` | 9 | 文本、物品、调度、经济、PAPI、YAML、YAML 补丁、动作栏、语言 |
 
 ---
 
 ## 4. 启动与关闭
 
-`MenuPlugin.onEnable()` 按**固定顺序**执行六步，前两步失败即禁用插件：
+`MenuPlugin.onEnable()` 按**固定顺序**执行六步 + 一步 PAPI 注册，前两步失败即禁用插件：
 
 | 步骤 | 动作 | 失败后果 |
 |---|---|---|
 | 1 | `MenuConfig.load(this)` | 记 SEVERE，`disablePlugin`，中止 |
 | 2 | `initStorage()`：读 `storage.yml`，选后端，建池建表 | 记 SEVERE，`disablePlugin`，中止 |
 | 3 | `ItemStackUtil.init()` / `EconomyUtil.init()` / `PlaceholderUtil.init()` | 各自降级（见 §4.2） |
-| 4 | 构造 service、executor、guiManager | — |
-| 5 | 注入回调（见 §4.1） | — |
-| 6 | `registerCommand()` + `registerListeners()` | 见下 |
+| 4 | 构造 service、executor、guiManager、limitCache、libraryGui、settingsGui、editGui | — |
+| 5 | 注入回调（见 §4.1）+ `setLimitCache` / `setItemService` 接线 | — |
+| 6 | `registerCommand()` + `registerListeners()`（含编辑器与引导监听） | 见下 |
+| 7 | `registerExpansion()`：PAPI 在位时注册 `%exmenu_*%` 变量 | 记 WARNING，不影响其余功能 |
 
 **顺序不可调换的原因**：步骤 4 的 `MenuGuiManager` 构造需要 `MenuConfig`
 （拿 `noWorld`、`permission` 等开关），必须在步骤 1 之后；
@@ -297,7 +305,7 @@ InputManager.GuiHolder.set(guiManager);
 `MenuConfig.reload(plugin)` **不是**替换对象，而是：
 
 1. 调 `load(plugin)` 构造一份**新的** `MenuConfig`
-2. 把新对象的 24 个字段逐个复制到当前对象
+2. 把新对象的全部实例字段逐个复制到当前对象
 3. **最后**才赋值那 6 个集合字段
 
 **为什么这么绕**：调用方（`MenuGuiManager`、`MainCommand` 等）持有的是
@@ -340,21 +348,25 @@ if (guiManager != null) {
 
 ### 6.1 顺序
 
-| 步骤 | 动作 | 失败行为 |
-|---|---|---|
-| 1 | `config.getMenu(name)` | 无此菜单 → `noMenu` |
-| 2 | 补 `.yml` 后缀 | — |
-| 3 | 权限校验 | 拒绝 → `noPermission` |
-| 4 | 世界黑名单校验 | 拒绝 → `noCommandPermission` |
-| 5 | `normalizeSize()`：夹到 9–54，向上取 9 的倍数 | — |
-| 6 | 标题：PAPI → 颜色代码 | — |
-| 7 | 建 `ChestGui`，设全局点击取消 | — |
-| 8 | 解析按钮 + **两次批量查询** | — |
-| 9 | 逐按钮：权限 → 隐藏 → 建物品 → 放槽位 | 任一不通过则跳过 |
-| 10 | 有 `pane` 则填充背景 | — |
-| 11 | `gui.show(player)` | — |
+| 步骤 | 动作 | 线程 | 失败行为 |
+|---|---|---|---|
+| 1 | `config.getMenu(name)` | 调用线程 | 无此菜单 → `noMenu` |
+| 2 | 补 `.yml` 后缀 | — | — |
+| 3 | 权限校验 | 调用线程 | 拒绝 → `noPermission` |
+| 4 | 世界黑名单校验 | 调用线程 | 拒绝 → `noCommandPermission` |
+| 5 | `normalizeSize()`：夹到 9–54，向上取 9 的倍数 | 调用线程 | — |
+| 6 | 标题：PAPI → 颜色代码 | 调用线程 | — |
+| 7 | `parseButtons()`（纯内存，带缓存） | 调用线程 | — |
+| 8 | **两次批量查询**（物品库 IN + 玩家限制） | **异步线程** | 空集降级 |
+| 9 | 逐按钮：权限 → 隐藏 → 建物品 → 放槽位 | 实体线程 | 任一不通过则跳过 |
+| 10 | 有 `pane` 则填充背景 | 实体线程 | — |
+| 11 | `gui.show(player)` | 实体线程 | — |
 
-管理员预览（`/exmenu view`、`adminOpen`）在第 3、4 步**绕过**权限与世界校验。
+第 1~7 步通过后 `open()` 即返回 true（语义 = "已排入渲染队列"）；
+第 8 步是数据库往返，**绝不允许跑在游戏线程上**；
+第 9~11 步构建 IFramework 界面，**必须回到实体线程**（IFramework 非线程安全）。
+
+管理员预览（`/exmenu view`、`adminOpen`、编辑器预览）在第 3、4 步**绕过**权限与世界校验。
 
 ### 6.2 批量查询（避免 N+1）
 
@@ -368,8 +380,9 @@ limitService.findMapByPlayerUuid(player.getUniqueId())   // 一条 = 查询
 `findMapByPlayerUuid` 每个 `open()` 只调一次，结果按 `menuItemId` 建 map。
 这是渲染路径上最重要的性能设计 —— 54 槽菜单若逐按钮查库就是 54 次往返。
 
-> ⚠️ `IN` 列表长度**无上限**，而 SQLite 的变量上限是 999。
-> 按钮 id 极多时需要分片查询。
+> ✅ `IN` 列表**已做分片**：`MenuItemService.findMapByIds` 与
+> `MenuLimitService` 的批量删除都以 500 个参数一片（SQLite 变量上限 999），
+> 巨型菜单不再有风险。
 
 ### 6.3 槽位冲突
 
@@ -497,8 +510,9 @@ PAPI 替换  →  %input% 替换  →  %player% 替换
 匹配是**大小写不敏感**的（`regionMatches(true, ...)`）。
 
 > ⚠️ 后果：标签名不能是"另一个标签名 + `]`"，否则会被误判。
-> 也正因包含 `]`，`[actionbar]` 这种**未定义**的标签不会被 `[action]` 匹配，
-> 而是**完全匹配不上** → 报 `configError` → **中断整条动作链**。
+> 也正因比较含 `]`，`[action]` **不会**抢走 `[actionbar]`（曾相反：`[actionbar]`
+> 不在枚举里时完全匹配不上 → 报 `configError` → **中断整条动作链**；
+> 现已是正式标签，行为相反但仍值得知道）。
 
 ---
 
@@ -635,20 +649,31 @@ needTime   = (cd > 0 && config.isActionCd())       || param.isCdHide();
 
 ### 10.1 流程
 
-按钮配了非空 `input` 时，点击后不执行动作，而是：
+按钮配了非空 `input` 时，点击后不执行动作，而是按 `inputMethod` 走两条通道之一：
+
+**聊天通道（默认）**：
 
 1. 建 `InputSession`（存**拷贝后**的按钮参数 + 来源界面）
 2. `InputManager.begin()` 登记到 `ConcurrentHashMap`，登记超时任务
 3. 关闭界面
 4. 发提示语
+5. 玩家发言后由 `ChatInputListener` 在 **`EventPriority.LOWEST`** 拦截：
+   1. **先取消事件**（避免消息泄露到公共聊天）
+   2. `message == null` → 直接返回（已取消，会话保留）
+   3. 含 `%` → 拒绝并提示，**会话不结束**（玩家可重试）
+   4. 类型校验失败 → 提示，**会话不结束**
+   5. 通过 → `end()`，`MenuExecutor.setInput` 写值，`InputManager.finish()` 收尾
 
-玩家发言后由 `ChatInputListener` 在 **`EventPriority.LOWEST`** 拦截：
+**铁砧通道（`inputMethod: ANVIL`）**：
 
-1. **先取消事件**（避免消息泄露到公共聊天）
-2. `message == null` → 直接返回（已取消，会话保留）
-3. 含 `%` → 拒绝并提示，**会话不结束**（玩家可重试）
-4. 类型校验失败 → 提示，**会话不结束**
-5. 通过 → `end()`，把输入值写入 `MenuButtonParam.inputValue`，`runAtEntity` 执行原动作
+1. `AnvilInputManager.begin()` 弹 `AnvilGui`（不登记会话表、不关聊天事件）
+2. `setOnNameInputChanged` 跟踪输入文本；**点击输出格（rawSlot=2）= 提交**
+3. 提交前同样拒绝含 `%` 的输入并按 `InputTypeEnum` 校验；失败**不关界面**可重试
+4. 直接关闭铁砧 = 取消，回到来源菜单
+5. 通过 → `MenuExecutor.setInput` 写值，`InputManager.finish()` 收尾（与聊天通道共用）
+
+`InputManager.finish()` 是两条通道的公共收尾：`runAtEntity` 后按 `confirm`
+决定弹确认界面，否则走 `executeWithLimitGate` 原子门槛执行。
 
 退出方式：输入大写 `T`（**精确匹配，区分大小写**）。
 
@@ -820,7 +845,7 @@ Class.forName("io.papermc.paper.threadedregions.RegionizedServer")
 
 需要改 `command/MainCommand.java` 的 **4 处**：
 
-**① 注册权限**（`PERMISSIONS`，第 53–66 行）
+**① 注册权限**（`static` 块里的 `PERMISSIONS.put(...)`）
 
 ```java
 PERMISSIONS.put("myCommand", "exmenu.myCommand");
@@ -828,24 +853,25 @@ PERMISSIONS.put("myCommand", "exmenu.myCommand");
 
 > 这里的键用 **camelCase**（如 `addItem`）。
 
-**② 加 case 分支**（第 118–145 行）
+**② 加 case 分支**（`onCommand` 的 `switch (sub)`）
 
 ```java
 case "mycommand":            // ← 注意：这里必须全小写
     return handleMyCommand(sender, args);
 ```
 
-> ⚠️ **这是最容易出错的地方**：`PERMISSIONS` 的键是 camelCase，
-> 而 `case` 标签是小写。因为 `onCommand` 先做
-> `sub = args[0].toLowerCase(Locale.ROOT)` 再查 `PERMISSIONS`，
-> 所以两者大小写形式不同但指向同一项。**两处都要写对**。
+> ⚠️ `PERMISSIONS` 的键用 camelCase（展示给 Tab 补全），而 `case` 标签是小写。
+> 权限查找走 `permissionFor(sub)`（**大小写不敏感**）—— 早期版本直接用
+> `PERMISSIONS.get(小写串)` 配 camelCase 键，导致 `addItem` 等四个子命令
+> 永远查不到权限，已修复。新加子命令时两种写法照常写即可，查找不再依赖大小写巧合。
 
 **③ 写处理方法**，返回 `boolean`（`true` 表示已处理，Spigot 要求）
 
-**④ Tab 补全**（`onTabComplete`，第 935 行起）
+**④ Tab 补全**（`onTabComplete` 方法）
 
 - `args.length == 1`：自动遍历 `PERMISSIONS.keySet()`，**无需改动**
-- `args.length == 2`：如需菜单名补全，加进第 952 行的菜单名单
+- `args.length == 2`：如需菜单名补全，把子指令名加进那个用 `"xxx".equals(sub)`
+  判断的 `if` 条件里（子指令集合现在含 `edit`）
 - `args.length == 3`：目前返回 `null`（不给建议）
 
 > ⚠️ **大小写陷阱（已修复，但新加时仍要注意）**：
@@ -904,7 +930,7 @@ param.setMyField(section.getString("myField", "默认值"));
 
 **② `param/MenuButtonParam.java`** —— 加字段 + getter/setter
 
-> ⚠️ **别忘了 `copy()`**（第 651 行附近）！该方法**手工逐个复制**所有字段。
+> ⚠️ **别忘了 `copy()` 方法**（`MenuButtonParam` 末尾附近）！该方法**手工逐个复制**所有字段。
 > 漏掉的字段在**点击时**会丢失值（点击路径必走 `copy()`），
 > 表现为"配置读到了但点下去没效果"，极难排查。
 
@@ -943,7 +969,9 @@ storage = "mysql".equals(type) ? new MysqlStorage() : new SqliteStorage();
 
 ### 13.5 新增一个界面
 
-参考 `ConfirmGuiManager`（178 行，最简单的完整例子）。
+参考 `ConfirmGuiManager`（200 行，最简单的完整例子）；
+需要"先异步取数再建界面"的例子看 `ItemLibraryGuiManager`，
+需要"文本输入 + 取消回跳"的例子看 `AnvilInputManager`。
 
 IFramework 的最小模式：
 
@@ -970,8 +998,9 @@ gui.show(player);
 - 需要异步取数时：先异步查库，再 `SchedulerUtil.runAtEntity` 回实体线程构建界面
   （**IFramework 不是线程安全的**）
 
-**`constants/GuiTypeEnum` 有用吗？** **没有。整个类是死代码**，
-无任何引用。新增界面不需要碰它。
+**`constants/GuiTypeEnum` 有用吗？** 曾经是——该类是图形化编辑流程的设计残留、
+零引用，**本轮已删除**；真正的图形化编辑由 `inventory/EditGuiManager` 实现。
+新增界面不需要碰它（也不存在了）。
 
 ### 13.6 接入新经济插件 / 使用动作钩子
 
@@ -1014,14 +1043,19 @@ gui.show(player);
 |---|---|
 | `[point]` 点券 | **占位实现**，只发一句提示音 |
 | `[performCommand]` | 与 `[player]` 完全相同，无权限绕过机制 |
-| `openCommand` / `openItem` | 配置已解析进 `commandMap` / `itemMap`，但**无监听器消费** |
+| `openCommand` / `openItem` | 配置已解析进 `commandMap` / `itemMap`，但**无监听器消费**（见 §14.6 注） |
 | Shift+F | `config.yml` 有配置，**无消费者** |
-| `gui/item.yml` | 已加载，**无消费者**（物品库界面未接线） |
-| `GuiTypeEnum` | 整个类死代码 |
 | `shopType: buy` / `sell` | 只支持 `leftBuyRightSell` / `leftSellRightBuy` |
 | 更新检查 | `isCheckUpdate` 无实现 |
 | `EconomyUtil` | 只支持 Vault |
-| 图形化创建 / 编辑菜单 | 未实现，`/exmenu create` 只写骨架文件 |
+| 头颅渲染 | `head` / `headBase` 解析后无渲染效果，`applyHeadTexture()` 无调用者 |
+
+> **本轮已补齐**（原列于此表，现移出）：
+> 物品库界面已接线（`/exmenu library` + 编辑器选取）；
+> 图形化编辑菜单已实现（`/exmenu edit`），`GuiTypeEnum` 残留类已随之删除；
+> `autoCreateId` 已被 `create` / 编辑器消费；`[broadcast]` `[actionbar]`
+> `[effect]` `[heal]` `[feed]` `[exp]` 六个标签已实现；
+> 铁砧输入通道（`inputMethod: ANVIL`）已实现。
 
 ### 14.2 无渲染效果的按钮字段
 
@@ -1036,23 +1070,31 @@ gui.show(player);
 
 ### 14.3 其它死代码
 
-- `MenuChecker.LimitView` —— 内部接口，**零实现、零引用**
+**本轮删除的**（审计确认零调用）：`constants/GuiTypeEnum`（整类）、
+`MenuChecker.LimitView`、`MenuItemService.emptyMap`、`SqliteStorage.warn`、
+`MenuExecutor.needsInput` / `recordUsage` / `knownTags`、
+`MenuGuiManager.openAsPlayer` / `getSize` / `refresh(Player)` /
+`findFreshLimit`、`MenuButtonParam.hasLimit` / `isPersistent`。
+
+**本轮被"复活"的**（新功能开始消费，不再是死代码）：
+`MenuItemService.findAll` / `count`（物品库界面）、`PlaceholderUtil.isEnabled`
+（expansion 注册）、`MenuConfig.getLanguage` / `isAutoCreateId` /
+`getItemGuiConfig`（配置中心与编辑器）。
+
+**仍然无调用点**（保留待后续处理）：
+
 - `YamlUtil` 的 `getStringList` / `getSection` / `getString` / `getInt` /
   `getBoolean` / `loadDirectory` —— **全部 6 个都无调用**
   （代码里改用 `ButtonParser.toStringList` 和裸 getter）
-- `MenuItemService.findAll` / `count` / `deleteByIds` / `emptyMap`
-  （`findAll` 与 `count` 是物品库界面**本来需要的** API）
-- `MenuLimitService.findAll`
-- `SqliteStorage.warn`、`InputManager.size`、`InputSession.elapsedSeconds`
-- `MenuExecutor.needsInput` / `recordUsage` / `knownTags`
-- `MenuGuiManager.openAsPlayer` / `getSize` / `refresh(Player)`
-- `MenuButtonParam.getRaw` / `hasLimit` / `isPersistent`
-- `SchedulerUtil.isFolia` / `cancelTasks` / `runTaskLaterAsynchronously`
-- `PlaceholderUtil.isEnabled`、`ConfirmGuiManager.sendHint`、
-  `ClockInteractListener.cleanup`、`ItemStackUtil.applyHeadTexture`
-- `MenuConfig` 的 `getLanguage` / `isAutoCreateId` / `getAdminOpenPermission` /
-  `isCheckUpdate` / `isShiftEnable` / `getShiftMenu` / `getCommandMap` /
-  `getItemMap` / `getItemGuiConfig`
+- `MenuItemService.deleteByIds` / `deleteAll`、`MenuLimitService.findAll`
+- `InputManager.size`、`InputSession.elapsedSeconds`、
+  `ConfirmGuiManager.sendHint`、`MenuButtonParam.getRaw`
+- `SchedulerUtil.isFolia` / `runTaskLaterAsynchronously`（`cancelTasks` 在
+  `onDisable` 有调用，已激活）
+- `ItemStackUtil.applyHeadTexture` —— 头颅渲染接线后即会激活，暂留
+- `MenuConfig` 的 `getAdminOpenPermission` / `isCheckUpdate` / `isShiftEnable` /
+  `getShiftMenu` / `getCommandMap` / `getItemMap`（后两个要等
+  `openCommand` / `openItem` 监听器接线）
 - `pom.xml` 声明的 `item-nbt-api` 与 `bstats` —— **无源码引用**
   （`Metrics` 在零个源文件中出现）
 - 语言文件里**无调用**的键：`noPlayerFailureMsg`、`money`、`point`、`addMenuItemMsg`
@@ -1071,7 +1113,6 @@ gui.show(player);
 | `storage/Storage.init()` | "幂等" | 两个实现都**无条件新建连接池**，重复调用会泄漏 |
 | `MenuItemService.save()` | 原子 upsert | 实为 `findIdByMd5` → INSERT/UPDATE，并发冲突返回 null |
 | `pom.xml` 的 NBT 注释 | 用于"物品库序列化" | 物品序列化用的是 Gson，`de.tr7zw` 零引用 |
-| `GuiTypeEnum` 类注释 | 引用了 `HandyInventory` | 该类**在本代码库中不存在**（旧实现残留） |
 
 ### 14.4 值得优先修的
 
@@ -1080,10 +1121,12 @@ gui.show(player);
 1. **`Storage.init()` 不幂等**（§13.4）—— 重复调用会泄漏前一个连接池。
    当前只被 `onEnable` 调用一次，属潜在问题。
 
-> 以下问题已在最近一轮修复中解决，见 §14.5：
+> 以下问题已在最近两轮修复中解决：
 > `MenuChecker` 闸门竞态（次数超发）、`InputManager` ThreadLocal 跨线程
 > （`%input%` 恒为空）、`onDisable` 不取消延迟任务、`MenuItemService.save()`
-> 非原子、确认界面绕过限购、`pane` 装饰板不生效、卖出不看存款结果。
+> 非原子、确认界面绕过限购、`pane` 装饰板不生效、卖出不看存款结果；
+> 以及本轮的 `open()` 主线程查库、点击路径冗余回查、`PERMISSIONS`
+> camelCase 查找失效、`findMapByIds` O(n²)、IN 无分片、`autoCreateId` 惰性。
 
 ### 14.5 已修复的缺陷（记录备查）
 
@@ -1105,6 +1148,12 @@ gui.show(player);
 | 卖出不看 `deposit()` 返回值 | 物品已扣、钱没到账，却提示"出售成功" |
 | `onDisable` 不取消调度任务 | 卸载后 `[delay]` 续跑，连接池已关闭 → 异常 |
 | `MenuItemService.save()` 先查后插 | 并发插入时败者误报"存储失败" |
+| `open()` 在主线程同步查库 | 每次开菜单阻塞游戏线程两次数据库往返；改为异步预取 + 实体线程构建 |
+| 点击路径执行前回查限制记录 | 限购点击在实体线程多一次 `SELECT`，且 `execute()` 根本不消费该值 —— 删除 |
+| `PERMISSIONS` 用 camelCase 键 + 小写查询串 | `addItem` / `getItem` / `getMaterial` / `adminOpen` 理论上永远被拒 —— `permissionFor()` 大小写不敏感 |
+| `findMapByIds` 用 `List.contains` 去重 | 大菜单 O(n²) —— 改 `LinkedHashSet` |
+| `IN` 查询无分片 | 参数超 999 时 SQLite 报错 —— 500 一片自动分片 |
+| `autoCreateId` 被 `create` 忽略 | 新手照抄骨架后 cd/limit 静默失效 —— `create` 与编辑器都按开关分配负数 id |
 
 > 多数属于"配置/代码语义错位""漏分支"或"跨线程假设不成立"。
 > 新增功能时对照此表自检。
@@ -1127,40 +1176,48 @@ gui.show(player);
 
 | 类 | 行数 | 职责 |
 |---|---|---|
-| `command/MainCommand` | 855 | 指令解析、权限、Tab 补全 |
-| `core/MenuExecutor` | 720 | 动作链执行、限制记录 |
-| `inventory/MenuGuiManager` | 691 | 渲染、按钮缓存、点击回调 |
-| `param/MenuButtonParam` | 522 | 按钮全部属性（50 个字段） |
-| `util/ItemStackUtil` | 357 | 材质解析、物品构建与序列化 |
-| `service/MenuLimitService` | 348 | 次数与冷却的原子读写 |
-| `config/MenuConfig` | 338 | 配置快照与就地重载 |
-| `util/TextUtil` | 300 | 颜色、表达式求值、切分 |
-| `service/MenuItemService` | 273 | 物品库 CRUD |
-| `inventory/InputManager` | 245 | 输入会话状态机 |
-| `core/MenuChecker` | 206 | 五关准入检查 |
-| `MenuPlugin` | 201 | 装配与生命周期 |
-| `inventory/ButtonParser` | 201 | YAML → param |
-| `inventory/ConfirmGuiManager` | 178 | 二次确认界面 |
-| `util/YamlUtil` | 165 | YAML 读写 |
-| `util/LangUtil` | 157 | 语言与消息 |
-| `core/ConditionEvaluator` | 156 | 条件表达式求值 |
-| `util/EconomyUtil` | 155 | Vault 反射封装 |
-| `listener/ClockInteractListener` | 137 | 时钟物品右键 |
-| `util/SchedulerUtil` | 118 | Spigot / Folia 调度抽象 |
-| `storage/SqliteStorage` | 113 | SQLite 后端 |
-| `storage/MysqlStorage` | 101 | MySQL 后端 |
-| `constants/CommandTypeEnum` | 96 | 16 个动作标签 |
-| `enter/MenuLimit` | 91 | 限制记录实体 |
-| `util/PlaceholderUtil` | 81 | PAPI 反射封装 |
-| `enter/MenuItem` | 75 | 物品库实体 |
-| `inventory/MenuSession` | 75 | 管理员预览标记 |
-| `constants/InputTypeEnum` | 66 | 3 种输入类型 |
-| `storage/Storage` | 61 | 存储接口 |
-| `inventory/InputSession` | 57 | 输入会话 |
-| `listener/ChatInputListener` | 56 | 聊天输入拦截 |
-| `constants/GuiTypeEnum` | 38 | ⚠️ 死代码 |
-| `listener/PlayerQuitListener` | 38 | 退出清理 |
-| `inventory/ConfigProvider` | 12 | 配置快照接口 |
+| `command/MainCommand` | 1048 | 指令解析、权限、Tab 补全 |
+| `inventory/EditGuiManager` ★ | 1353 | 可视化菜单编辑器（状态机 + 写盘 + 预览） |
+| `core/MenuExecutor` | 934 | 动作链执行、限制记录 |
+| `inventory/MenuGuiManager` | 928 | 渲染、按钮缓存、点击回调 |
+| `param/MenuButtonParam` | 578 | 按钮全部属性（53 个字段） |
+| `service/MenuLimitService` | 452 | 次数与冷却的原子读写（IN 分片） |
+| `util/ItemStackUtil` | 413 | 材质解析、物品构建与序列化 |
+| `config/MenuConfig` | 384 | 配置快照与就地重载 |
+| `util/TextUtil` | 335 | 颜色、表达式求值、切分 |
+| `service/MenuItemService` | 328 | 物品库 CRUD（IN 分片） |
+| `inventory/SettingsGuiManager` ★ | 319 | 配置中心界面 |
+| `inventory/InputManager` | 291 | 输入状态机（聊天 + 共用收尾） |
+| `MenuPlugin` | 279 | 装配与生命周期 |
+| `util/YamlPatch` ★ | 241 | 保注释的行内 YAML 补丁 |
+| `inventory/ButtonParser` | 220 | YAML → param |
+| `core/MenuChecker` | 217 | 五关准入检查 |
+| `inventory/ConfirmGuiManager` | 200 | 二次确认界面 |
+| `util/YamlUtil` | 190 | YAML 读写 |
+| `core/ConditionEvaluator` | 176 | 条件表达式求值 |
+| `util/EconomyUtil` | 168 | Vault 反射封装 |
+| `util/LangUtil` | 178 | 语言与消息 |
+| `listener/ClockInteractListener` | 161 | 时钟物品右键 |
+| `util/SchedulerUtil` | 157 | Spigot / Folia 调度抽象 |
+| `inventory/ItemLibraryGuiManager` ★ | 274 | 物品库浏览 / 选取 |
+| `inventory/AnvilInputManager` ★ | 143 | 铁砧输入通道 |
+| `util/ActionBarUtil` ★ | 119 | 动作栏跨平台发送 |
+| `expansion/EXMenuExpansion` ★ | 117 | 对外 PAPI 变量 |
+| `core/LimitCache` ★ | 114 | PAPI 用限制快照缓存 |
+| `constants/CommandTypeEnum` | 119 | 22 个动作标签 |
+| `storage/SqliteStorage` | 110 | SQLite 后端 |
+| `storage/MysqlStorage` | 109 | MySQL 后端 |
+| `enter/MenuLimit` | 95 | 限制记录实体 |
+| `inventory/MenuSession` | 93 | 管理员预览标记 |
+| `util/PlaceholderUtil` | 93 | PAPI 反射封装 |
+| `enter/MenuItem` | 80 | 物品库实体 |
+| `listener/OnboardingListener` ★ | 80 | 首次启动引导 |
+| `constants/InputTypeEnum` | 71 | 3 种输入类型 |
+| `storage/Storage` | 83 | 存储接口 |
+| `inventory/InputSession` | 68 | 输入会话 |
+| `listener/ChatInputListener` | 67 | 聊天输入拦截 |
+| `listener/PlayerQuitListener` | 44 | 退出清理 |
+| `inventory/ConfigProvider` | 17 | 配置快照接口 |
 
 ## 附录 B：术语表
 

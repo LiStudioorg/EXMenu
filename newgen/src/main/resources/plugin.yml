@@ -32,6 +32,9 @@ permissions:
       exmenu.convert: true
       exmenu.adminOpen: true
       exmenu.check: true
+      exmenu.library: true
+      exmenu.edit: true
+      exmenu.settings: true
   exmenu.open:
     description: 打开菜单
     default: true
@@ -73,4 +76,13 @@ permissions:
     default: op
   exmenu.check:
     description: 校验菜单配置
+    default: op
+  exmenu.library:
+    description: 浏览物品库
+    default: op
+  exmenu.edit:
+    description: 可视化编辑菜单
+    default: op
+  exmenu.settings:
+    description: 打开配置中心
     default: op

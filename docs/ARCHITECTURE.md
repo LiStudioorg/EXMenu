@@ -20,7 +20,7 @@ EXMenu 是 PlayerMenu v1.11.0 的**重写实现**：保持 YAML 配置语义与�
 | 跨版本材质 | ItemCompatLib | **XSeries** |
 | NBT | HandyLib 封装 | **item-nbt-api** |
 | 存储 | HandyLib `Db` 链式 API | **原生 JDBC + HikariCP** |
-| 源码规模 | 61 文件 / 211 KB | 35 文件 / 325 KB（含更多注释） |
+| 源码规模 | 61 文件 / 211 KB | 42 文件 / 约 11.4k 行（含新手 GUI 工具链） |
 
 **产物**：`newgen/target/EXMenu-1.1.0.jar`（约 16 MB，已 shade 并重定位）。
 
@@ -30,35 +30,45 @@ EXMenu 是 PlayerMenu v1.11.0 的**重写实现**：保持 YAML 配置语义与�
 
 ```
                     ┌─────────────────────────────────────┐
-   presentation     │  command/MainCommand                │  14 个子命令
-                    │  listener/{ChatInput,ClockInteract, │  3 个监听器
-                    │            PlayerQuit}              │
-                    └───────────────┬─────────────────────┘
-                                    │
-                    ┌───────────────▼─────────────────────┐
+   presentation     │  command/MainCommand                │  17 个子命令
+                    │  listener/{ChatInput,ClockInteract, │  4 个监听器
+                    │            PlayerQuit,Onboarding}   │  (+编辑器自身)
+                     └───────────────┬─────────────────────┘
+                                     │
+                     ┌───────────────▼─────────────────────┐
    render           │  inventory/MenuGuiManager           │  渲染 + 点击回调
                     │  inventory/ConfirmGuiManager        │  二次确认界面
                     │  inventory/ButtonParser             │  YAML → 模型
+                    │  inventory/AnvilInputManager        │  铁砧输入通道
+                    │  inventory/EditGuiManager        ★  │  可视化菜单编辑器
+                    │  inventory/SettingsGuiManager     ★ │  配置中心界面
+                    │  inventory/ItemLibraryGuiManager  ★ │  物品库浏览/选取
                     └───────────────┬─────────────────────┘
                                     │
-                    ┌───────────────▼─────────────────────┐
+                     ┌───────────────▼─────────────────────┐
    engine           │  core/MenuChecker                   │  五关校验
                     │  core/MenuExecutor                  │  动作链 + 商店 + 经济
                     │  core/ConditionEvaluator            │  条件表达式
+                    │  core/LimitCache                  ★ │  PAPI 只读快照缓存
                     └───────────────┬─────────────────────┘
                                     │
-                    ┌───────────────▼─────────────────────┐
+                     ┌───────────────▼─────────────────────┐
+   expansion        │  expansion/EXMenuExpansion        ★ │  对外 PAPI 变量
+                    └───────────────┬─────────────────────┘
+                                    │
+                     ┌───────────────▼─────────────────────┐
    persistence      │  service/{MenuItem,MenuLimit}Service│  DAO
                     │  storage/{Sqlite,Mysql}Storage      │  方言差异
                     └───────────────┬─────────────────────┘
                                     │
-                    ┌───────────────▼─────────────────────┐
-   model            │  param/MenuButtonParam (50 字段)    │
+                     ┌───────────────▼─────────────────────┐
+   model            │  param/MenuButtonParam (53 字段)    │
                     │  enter/{MenuItem,MenuLimit}         │
                     └─────────────────────────────────────┘
 
-   横切关注点：util/{Scheduler,Text,ItemStack,Lang,Yaml,Economy,Placeholder}Util
-              config/MenuConfig（配置快照）  MenuPlugin（装配与接线）
+   横切关注点：util/{Scheduler,Text,ItemStack,Lang,Yaml,Economy,Placeholder,
+             ActionBar ★,YamlPatch ★}Util
+             config/MenuConfig（配置快照）  MenuPlugin（装配与接线）
 ```
 
 ### 依赖方向
@@ -83,9 +93,10 @@ EXMenu 是 PlayerMenu v1.11.0 的**重写实现**：保持 YAML 配置语义与�
 | 1 | `MenuConfig.load(this)` | 记 SEVERE 并 `disablePlugin` |
 | 2 | `initStorage()` → `storage.init()` | 记 SEVERE 并 `disablePlugin` |
 | 3 | `ItemStackUtil.init()` / `EconomyUtil.init()` / `PlaceholderUtil.init()` | 均**优雅降级**，不致命 |
-| 4 | 构造 `MenuItemService` / `MenuLimitService` / `MenuExecutor` / `MenuGuiManager` | — |
+| 4 | 构造 `MenuItemService` / `MenuLimitService` / `MenuExecutor` / `MenuGuiManager`；再构造 `LimitCache`、`ItemLibraryGuiManager`、`SettingsGuiManager`、`EditGuiManager` 并接线（`setLimitCache` / `setItemService`） | — |
 | 5 | 接线：`setGuiOpener` / `setSubActionHandler` / `InputManager.*Holder.set` | — |
-| 6 | 注册命令与监听器 | 命令缺失仅告警（见下） |
+| 6 | 注册命令与监听器（含 `EditGuiManager` 自身、`OnboardingListener`、匿名的退出清缓存监听） | 命令缺失仅告警（见下） |
+| 7 | `registerExpansion()` —— PAPI 在位时注册 `EXMenuExpansion` | 失败仅告警，不影响菜单功能 |
 
 **为什么存储失败必须禁用**：带着坏掉的数据库继续跑，只会在玩家点按钮时抛一堆异常，
 且现象是"按钮没反应"，排查成本远高于启动时明确禁用。
@@ -117,20 +128,27 @@ EXMenu 是 PlayerMenu v1.11.0 的**重写实现**：保持 YAML 配置语义与�
 
 ## 5. 渲染管线
 
-`MenuGuiManager.open(player, menuName)`：
+`MenuGuiManager.open(player, menuName)`（**异步渲染管线**）：
 
 ```
 1. 取菜单配置          config.getMenu(name)      不存在 → 提示 noMenu
 2. 权限检查            checkPermission()
 3. 世界检查            isWorldBlocked()          命中 noWorld → 拒绝
 4. 规整 size           normalizeSize()           9~54 且为 9 的倍数
-5. 解析按钮            parseButtons()            带缓存，按 menuFile 键
-6. ★ 批量取数据        loadItemLibrary()         一次 IN 查询
-                       limitService.findMapByPlayerUuid()  一次查询
+5. 解析按钮            parseButtons()            带缓存，按 menuFile 键（纯内存）
+   ─── 以下进入异步段 ───
+6. ★ 批量取数据        itemService.findMapByIds()      一次 IN 查询（超 500 自动分片）
+   (异步线程)          limitService.findMapByPlayerUuid() 一次查询
+   ─── 回到实体线程 ───
 7. 逐按钮求值          权限过滤 → 隐藏条件 → 渲染
-8. 装配                StaticPane + GuiItem
+8. 装配                StaticPane + GuiItem（+ pane 装饰板）
 9. gui.show(player)
 ```
+
+`open()` 的返回值语义 = **"检查通过并已排入渲染队列"**，界面在一拍后的实体任务里出现。
+早期实现把第 6 步直接跑在调用线程（主线程）上，**每次开菜单都在做同步数据库 IO** ——
+这正是"开菜单瞬间卡顿"的元凶；现在数据库读写全部移出游戏线程，
+且界面构建保持在实体线程（IFramework 非线程安全）。
 
 ### 性能关键：第 6 步
 
@@ -151,6 +169,9 @@ EXMenu 是 PlayerMenu v1.11.0 的**重写实现**：保持 YAML 配置语义与�
 `parseButtons` 的结果按菜单文件名缓存，**缓存对象是共享的**。因此点击回调里
 必须先 `param.copy()` 再 `setEventClickType(event.getClick())` ——
 直接改缓存对象会把点击类型"串"到其他玩家的渲染上。
+
+缓存本体是 `ConcurrentHashMap`：Folia 下不同 region 的玩家可以并发触发
+同一菜单的解析，普通 `HashMap` 在这种情况下会损坏内部结构。
 
 ---
 
@@ -332,6 +353,7 @@ Class.forName("io.papermc.paper.threadedregions.RegionizedServer")
 | `confirm` | `confirm` | bool | `false` | 二次确认 |
 | `input` | `input` | str | — | 非空即触发输入流程 |
 | `inputType` | `inputType` | str | 取 `input` 值 | `TEXT`/`NUMBER`/`POSITIVE_NUMBER` |
+| `inputMethod` | `inputMethod` | str | `CHAT` | 输入通道：`CHAT`（聊天栏）/ `ANVIL`（铁砧界面） |
 | `shopType` | `shopType` | str | — | `buy`/`sell`/`leftBuyRightSell`/`leftSellRightBuy` |
 | `shopPrice` / `shopNumber` | 同名 | str | — | 支持公式 |
 | `shopMaterial` / `shopGiveMaterial` | 同名 | str | — | `材质:数量` |
@@ -421,11 +443,16 @@ AsyncPlayerChatEvent (LOWEST, ignoreCancelled=true)
 **为什么优先级是 `LOWEST`**：要在其他插件（聊天格式、禁言、聊天过滤）**之前**判断并取消。
 排在后面的话，被"禁言插件"取消的消息永远进不了输入流程，玩家会觉得输入框没反应。
 
-**为什么用 `ThreadLocal` 传输入值**：输入是"玩家打完字后立刻执行按钮"的流程，中间不跨线程。
-`clearInput()` 是必要的 —— 服务端线程池会复用线程，不清除的话下一个在这个线程上执行的
-动作可能读到上一个玩家残留的值。
+**为什么用 `ThreadLocal` 传输入值**（原文档说法，已废弃）—— 现实现输入值挂在
+`MenuButtonParam.inputValue` 上随参数传递（见 §15.1），与线程无关。
+`clearInput()` 已不存在。
 
 **超时兜底**：玩家开了输入却一直不说话，状态会永久残留，导致他之后发的每句话都被吃掉。
+
+**铁砧通道（`inputMethod: ANVIL`）**：不进入上面的聊天流程 ——
+`AnvilInputManager` 弹 `AnvilGui`，点击输出格提交、关界面取消；
+校验规则（`%` 拒绝、类型检查）与聊天通道一致，收尾共用 `InputManager.finish()`
+（确认界面 / 原子门槛三条路径不变）。天然没有聊天通道的事件竞争与超时问题。
 
 ---
 
@@ -466,6 +493,8 @@ AsyncPlayerChatEvent (LOWEST, ignoreCancelled=true)
 | 裸 `/exmenu` 帮助 | 被 `reload` 权限硬编码拦截 | **无需权限** | 普通玩家能看到"没权限"而非"未知命令" |
 | `[close]` 的 NPE | 确认界面下 `handyInventory == null` 崩溃 | 空值保护 | 修缺陷 |
 | 硬编码中文 | 命令类里有 | 全部走 `LangUtil` | 可本地化 |
+| 图形化编辑菜单 | HandyLib 内置实现 | `EditGuiManager` / `SettingsGuiManager` 以 IFramework 重新实现 | 功能重建（新手定位） |
+| 开菜单的数据库读取 | 调用线程同步读 | 异步预取 + 实体线程构建 | 主线程不再被 DB 阻塞 |
 
 ---
 
@@ -490,6 +519,12 @@ AsyncPlayerChatEvent (LOWEST, ignoreCancelled=true)
 | **卖出成功不看存款结果** | 经济插件拒绝时**物品已扣、钱没到账**，还提示"出售成功" | 检查 `EconomyUtil.deposit()` 返回值，失败则退还物品并提示 |
 | **`onDisable` 不取消调度任务** | `[delay]` 续跑与输入超时任务在插件卸载后仍触发，且连接池已关闭 | `onDisable` 先 `SchedulerUtil.cancelTasks(this)` 再关存储 |
 | **`MenuItemService.save()` 先查后写** | 并发插入时败者返回 null，玩家看到"存储失败"（物品其实已入库） | 改为"先插后查"：插入成功即完成，撞唯一索引再查回既有 id |
+| **`open()` 在主线程同步查库** | 每次开菜单阻塞游戏线程做两次数据库往返，WAL 下偶发几十毫秒卡顿 | 渲染管线改三段式：检查/解析（同步）→ 批量查库（异步）→ 构建显示（实体线程） |
+| **点击路径执行前回查限制记录** | 限购按钮每次点击在**实体线程**多做一次 `SELECT`（且结果不被 `execute()` 消费） | 删除回查；原子闸门本身即是唯一裁决 |
+| **`PERMISSIONS` 大小写查找失效** | map 键为 camelCase 而查询串已强制小写 —— `addItem` / `getItem` / `getMaterial` / `adminOpen` 理论上**永远被拒**（文档曾称已修，代码未修） | `permissionFor()` 大小写不敏感查找 |
+| **`findMapByIds` O(n²) 去重** | 巨型菜单（几十个物品库按钮）打开时解析开销平方增长 | `LinkedHashSet` 去重 |
+| **`IN` 查询无分片** | id 数超过 999 时 SQLite 直接报错，渲染/清理路径崩 | 超过 500 自动分片合并 |
+| **`autoCreateId` 被 `create` 忽略** | 文档承诺自动分配 id，实际骨架硬编码无 id —— 新手照抄后 cd/limit 静默失效 | `create` 与编辑器新增按钮都按开关分配最小未占用负数 id |
 
 ### 15.2 未完成（功能缺口）
 
@@ -497,48 +532,53 @@ AsyncPlayerChatEvent (LOWEST, ignoreCancelled=true)
    没有真正给点券；`shopEconomy: point` 同样被拒。
 2. **`[performCommand]` 与 `[player]` 行为完全相同** —— 二者都走
    `player.performCommand(body)`，不存在"绕过权限"的机制。
-3. **`gui/item.yml` 已加载但无人消费** —— 物品库浏览界面尚未接线。
-4. **`openCommand` / `openItem` 不生效** —— `MenuConfig.commandMap` / `itemMap`
+3. **`openCommand` / `openItem` 不生效** —— `MenuConfig.commandMap` / `itemMap`
    已填充但**无任何监听器消费**；缺少 `PlayerCommandPreprocessEvent` 监听器，
    也缺少手持物品右键的判定。`example.yml` 里"输入 `/mc` 打开"与
    "手持时钟右键打开"目前是**惰性的**。
    > 注：`clock.menu` 配置的时钟物品由 `ClockInteractListener` 正常处理，
    > 不受此影响。
-5. **Shift+F 未实现** —— `config.yml` 的 `shift.F.enable/menu` 与
+4. **Shift+F 未实现** —— `config.yml` 的 `shift.F.enable/menu` 与
    `MenuConfig.isShiftEnable()/getShiftMenu()` 存在但无消费者。
-6. **`GuiTypeEnum` 整个类未被使用** —— 图形化创建/编辑菜单流程未实现，
-   `/exmenu create` 只生成骨架文件。
-7. **`EconomyUtil` 只支持 Vault** —— 未接入 PlayerPoints / PlayerCurrency。
-8. **`hideEnchant`、`head`、`headBase`、`openItem` 解析后无渲染效果** ——
-   `ItemStackUtil.applyHeadTexture()` 从未被调用。
-9. **`shopType` 的 `buy` / `sell` 未实现** —— 只有 `leftBuyRightSell` /
+5. **`EconomyUtil` 只支持 Vault** —— 未接入 PlayerPoints / PlayerCurrency。
+6. **`hideEnchant`、`head`、`headBase`、`openItem` 解析后无渲染效果** ——
+   `ItemStackUtil.applyHeadTexture()` 已实现但渲染路径尚未接线。
+7. **`shopType` 的 `buy` / `sell` 未实现** —— 只有 `leftBuyRightSell` /
    `leftSellRightBuy` 有效，其它值报 configError 并阻止点击。
-10. **`ConditionEvaluator` 不支持 `!` 取反与 AND/OR** —— 前导 `!` 会被当作
-    "开关式条件"判为真；`a >= b >= c` 会拿 `a` 与字符串 `"b >= c"` 比较。
-11. **`config.yml` 的 `isCheckUpdate` 无更新检查器**；`autoCreateId` 被
-    `handleCreate` 忽略（骨架硬编码）。
-12. **`Storage.init()` 文档称幂等，实际每次都会新建连接池** —— 重复调用会泄漏前一个池。
-13. **未在真实服务端验证** —— 交付前仅通过编译、字节码链接与 YAML 结构校验。
+8. **`ConditionEvaluator` 不支持 `!` 取反与 AND/OR** —— 前导 `!` 会被当作
+   "开关式条件"判为真；`a >= b >= c` 会拿 `a` 与字符串 `"b >= c"` 比较。
+9. **`config.yml` 的 `isCheckUpdate` 无更新检查器**。
+10. **`Storage.init()` 文档称幂等，实际每次都会新建连接池** —— 重复调用会泄漏前一个池。
+11. **未在真实服务端验证** —— 交付前仅通过编译、字节码链接与 YAML 结构校验。
+
+> **本轮（新手 GUI 工具链）已补上的原缺口**：物品库界面已接线（`/exmenu library`）；
+> 图形化编辑菜单已实现（`/exmenu edit`），`GuiTypeEnum` 残留类已删除；
+> `autoCreateId` 已被 `create` 与编辑器消费；`[actionbar]` 已从"不存在的标签"
+> 变成正式实现（跨 Spigot/Paper/Folia）。
 
 ### 15.3 死代码
 
 审计确认以下成员**无任何调用点**，属于设计残留：
 
-- 整个类：`constants/GuiTypeEnum`
-- 方法：`MenuGuiManager.openAsPlayer` /
-  `getSize` / `refresh(Player)`、`MenuExecutor.needsInput` / `recordUsage` /
-  `knownTags`、`MenuChecker.LimitView`、`MenuButtonParam.hasLimit` /
+- 方法：`MenuChecker.LimitView`、`MenuButtonParam.hasLimit` /
   `isPersistent`、`MenuItemService.emptyMap`、`SqliteStorage.warn`、
+  `MenuGuiManager.openAsPlayer` / `getSize` / `refresh(Player)`、
+  `MenuExecutor.needsInput` / `recordUsage` / `knownTags`、
   `ItemStackUtil.applyHeadTexture`、
-  `YamlUtil.getStringList` / `getSection` / `loadDirectory` 等
+  `YamlUtil.getStringList` / `getSection` / `getString` / `getInt` / `getBoolean` /
+  `loadDirectory` 等
 - `pom.xml` 声明了 `item-nbt-api` 与 `bstats`，但**没有任何源文件引用**
 
-> 这些不影响功能，但会误导后续维护者。建议在下一轮清理中移除，
-> 或补上实现（尤其是 `openCommand` / `openItem` 与物品库界面）。
->
-> 已清理：`MenuPlugin.reloadPluginConfig`（逻辑与 `MainCommand.handleReload` 重复）
-> 与 `InputManager.cleanup`（被 `PlayerQuitListener` 经 `cancel` 覆盖）已删除；
+> **本轮已清理**：`constants/GuiTypeEnum`（整类删除，图形编辑改由
+> `EditGuiManager` 真正实现）、`MenuChecker.LimitView`、`MenuItemService.emptyMap`、
+> `SqliteStorage.warn`、`MenuButtonParam.hasLimit` / `isPersistent`、
+> `MenuGuiManager.openAsPlayer` / `getSize` / `refresh(Player)`、
+> `MenuExecutor.needsInput` / `recordUsage` / `knownTags`、
+> `MenuGuiManager.findFreshLimit`（其"实体线程回查数据库"本身就是性能缺陷）。
+> 此前已清理：`MenuPlugin.reloadPluginConfig`、`InputManager.cleanup`；
 > `ClockInteractListener.cleanup` 由死代码改为在玩家退出时实际调用。
+> 仍未清理：`YamlUtil` 的 6 个取值助手、`ItemStackUtil.applyHeadTexture`（等待头颅渲染接线）、
+> `pom.xml` 的 `item-nbt-api` / `bstats` 依赖。
 
 ---
 
@@ -624,20 +664,28 @@ mvn clean package
 |---|---|---|
 | `MenuPlugin` | 装配与接线 | 启动顺序不可调；同时是 `ConfigProvider` |
 | `MenuConfig` | 配置快照 | 整体重建；`reload` 就地刷新字段 |
-| `MainCommand` | 14 个子命令 | 路径穿越防护；`/exmenu check` 校验器 |
-| `MenuGuiManager` | 渲染 + 点击回调 | 批量查库消除 N+1；`param.copy()` 防串味 |
+| `MainCommand` | 17 个子命令 | 路径穿越防护；`/exmenu check` 校验器；权限查找大小写不敏感 |
+| `MenuGuiManager` | 渲染 + 点击回调 | 批量查库（异步段）消除 N+1；`param.copy()` 防串味；单菜单缓存失效 |
 | `ConfirmGuiManager` | 二次确认界面 | 配置缺失时退化为直接执行 |
 | `ButtonParser` | YAML → 模型 | 宽容解析，结构性错误才丢弃 |
+| `EditGuiManager` ★ | 可视化菜单编辑器 | 每玩家状态机；改动即时写盘（首次 `.bak`）+ 单菜单丢缓存；预览回跳 |
+| `SettingsGuiManager` ★ | 配置中心界面 | `YamlPatch` 保注释写盘 + 就地 reload |
+| `ItemLibraryGuiManager` ★ | 物品库浏览/选取 | 异步取数分页；选取模式供编辑器复用 |
+| `AnvilInputManager` ★ | 铁砧输入通道 | 点输出格提交 / 关界面取消；校验与聊天通道一致 |
 | `MenuChecker` | 五关校验 | 顺序不可调；返回枚举而非 boolean |
-| `MenuExecutor` | 动作链 + 商店 | 先校验后记录；递归支持下 `[delay]` |
+| `MenuExecutor` | 动作链 + 商店 | 先校验后记录；递归支持下 `[delay]`；写库后失效 `LimitCache` |
 | `ConditionEvaluator` | 条件求值 | 双字符优先；解析失败返回 null |
-| `InputManager` | 输入会话（静态） | `ConcurrentHashMap` + 超时兜底 |
-| `MenuItemService` | 物品库 DAO | MD5 去重 upsert |
-| `MenuLimitService` | 限制 DAO | **原子 UPDATE**，消除读后写竞态 |
+| `LimitCache` ★ | PAPI 用只读快照缓存 | 15s TTL + 异步刷新；读取路径零阻塞 IO |
+| `EXMenuExpansion` ★ | 对外 PAPI 变量 | `limit_remaining/used`、`cd_seconds`；PAPI 在位才注册 |
+| `InputManager` | 输入会话（静态） | `ConcurrentHashMap` + 超时兜底；`finish` 为聊天/铁砧共用收尾 |
+| `MenuItemService` | 物品库 DAO | MD5 去重 upsert；IN 分片 |
+| `MenuLimitService` | 限制 DAO | **原子 UPDATE**，消除读后写竞态；批量删除分片 |
 | `Storage` / `Sqlite` / `Mysql` | 存储后端 | 方言差异收敛在接口 |
 | `SchedulerUtil` | 统一调度 | 类加载探测 Folia |
 | `LangUtil` | 文本 | 内置默认值，缺失键返回 `<key>` |
 | `TextUtil` | 文本处理 | 颜色（含 hex）、占位符、分段 |
+| `ActionBarUtil` ★ | 动作栏跨平台 | Paper `sendActionBar` → Spigot bungee 反射 → 降级聊天 |
+| `YamlPatch` ★ | 保注释的行内 YAML 补丁 | 仅标量；配置中心写 `config.yml` 用 |
 | `ItemStackUtil` | 物品构建 | 跨版本材质、头颅、序列化 |
 
 ---

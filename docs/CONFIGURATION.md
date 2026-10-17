@@ -22,6 +22,7 @@
 11. [confirm.yml 与 item.yml](#11-confirmyml-与-itemyml)
 12. [语言文件](#12-语言文件)
 13. [常见配置陷阱](#13-常见配置陷阱)
+14. [EXMenu 对外提供的 PAPI 变量](#14-exmenu-对外提供的-papi-变量)
 
 ---
 
@@ -93,6 +94,9 @@ action:
 
 # 是否检查更新
 isCheckUpdate: false
+
+# 首次启动时是否给管理员发送引导消息（只发一次）
+firstRunHelp: true
 ```
 
 ### 2.1 通用项
@@ -105,6 +109,7 @@ isCheckUpdate: false
 | `permission` | Boolean | `false` | **是否启用菜单权限**。`true` 时菜单文件的 `permission` 节点才生效 |
 | `inputTimeout` | Int | `30` | 聊天输入等待秒数；`<= 0` 表示不超时 |
 | `isCheckUpdate` | Boolean | `false` | 是否检查更新 |
+| `firstRunHelp` | Boolean | `true` | 首次启动时向第一个进服的管理员发送引导消息（只发一次） |
 
 ### 2.2 `clock` —— 时钟物品
 
@@ -430,8 +435,9 @@ cd: 1h      # 1 小时（也可写 1时）
 | 键 | 类型 | 默认 | 说明 |
 |---|---|---|---|
 | `confirm` | Boolean | `false` | 先弹出确认界面 |
-| `input` | String | — | 非空即触发聊天输入流程 |
+| `input` | String | — | 非空即触发输入流程 |
 | `inputType` | String | 取 `input` 值 | `STRING` / `NUMBER` / `POSITIVE_NUMBER` |
+| `inputMethod` | String | `CHAT` | 输入通道：`CHAT`（聊天栏）或 `ANVIL`（铁砧界面） |
 
 详见 [第 10 节](#10-输入系统)。
 
@@ -456,11 +462,13 @@ commands:
 
 **匹配是大小写不敏感的**，且采用**最长匹配**。
 
-### 6.1 标签全表（16 个）
+### 6.1 标签全表（22 个）
 
 | 标签 | 说明 |
 |---|---|
 | `[message]` | 给点击的玩家发消息 |
+| `[broadcast]` | 全服广播（支持 & 颜色码） |
+| `[actionbar]` | 动作栏消息（跨 Spigot/Paper/Folia） |
 | `[player]` | 以**玩家身份**执行命令（需要玩家有权限） |
 | `[console]` | 以**控制台身份**执行命令（无需权限） |
 | `[op]` | 以 **OP 身份**执行，执行后立刻收回 OP |
@@ -469,16 +477,21 @@ commands:
 | `[dispatchCommand]` | 在**玩家所在位置**执行命令（命令方块形式） |
 | `[close]` | 关闭当前菜单 |
 | `[open]` | 打开另一个菜单 |
-| `[title]` | 发送标题，格式 `主标题:副标题` |
+| `[title]` | 发送标题，格式 `主标题;副标题` |
 | `[sound]` | 播放音效 |
 | `[delay]` | 延迟后继续执行后续动作 |
 | `[money]` | 给玩家加钱 |
 | `[point]` | 给玩家加点券 |
-| `[item]` | 给玩家物品 |
-| `[action]` | 自定义动作（扩展位） |
+| `[item]` | 给玩家物品，格式 `材质:数量` |
+| `[effect]` | 给药水效果，格式 `效果名:秒数:等级`，逗号分隔多组（如 `SPEED:10:1,JUMP:5:1`） |
+| `[heal]` | 回满生命并灭火（无需参数） |
+| `[feed]` | 回满饱食度（无需参数） |
+| `[exp]` | 给经验，默认给等级；`pts:100` 给经验值 |
+| `[action]` | 自定义动作（执行另一个按钮） |
 
-> ⚠️ **没有 `[actionbar]` 标签。** 写了未定义的标签会报 `配置异常` 并
-> **中断整条动作链**，后面的动作全部不执行。
+> ⚠️ **写了上表之外的标签**会报 `配置异常` 并**中断整条动作链**，
+> 后面的动作全部不执行。改完菜单记得跑 `/exmenu check`。
+> （历史上 `[actionbar]` 曾不在表内、触发过这一中断 —— 现已作为正式标签实现。）
 
 ### 6.2 执行身份对比
 
@@ -691,10 +704,32 @@ shopPrice: '100 * input'
 
 ### 10.2 流程
 
+**聊天通道（默认 `inputMethod: CHAT`）**
+
 1. 玩家点击按钮
 2. 关闭当前界面，提示输入
 3. 玩家在聊天栏输入（**输入内容不会被其他玩家看到**）
 4. 校验通过后执行原动作
+
+**铁砧通道（`inputMethod: ANVIL`）**
+
+```yaml
+- slot: 20
+  material: PAPER
+  name: '&e&l购买'
+  input: '请输入数量'
+  inputType: 'POSITIVE_NUMBER'
+  inputMethod: 'ANVIL'      # ← 弹铁砧界面而不是聊天栏
+  commands:
+    - '[console] give %player_name% diamond %input%'
+```
+
+1. 玩家点击按钮 → 弹出铁砧界面（输入框天然不进公共聊天）
+2. 在重命名栏输入 → **点右侧输出格确认**；直接关界面 = 取消（回到来源菜单）
+3. 校验规则与聊天通道完全一致（含 `%` 拒绝、类型校验），失败**不关界面**可重试
+
+> 铁砧通道对新手更直观，也避开了"聊天消息被其它插件抢先处理"的整类问题。
+> 两种通道的输出值都通过 `%input%` 参与替换，用法相同。
 
 ### 10.3 使用输入值
 
@@ -708,8 +743,12 @@ commands:
 
 ### 10.4 退出与超时
 
+**聊天通道**：
+
 - 输入大写 **`T`** 退出输入
 - 超过 `config.yml` 的 `inputTimeout` 秒未输入则自动取消
+
+**铁砧通道**：直接关闭界面即取消，不使用 `T` 退出与超时机制。
 
 > ⚠️ **含 `%` 的输入一律被拒绝** —— 否则玩家可以借此注入 PAPI 变量或命令占位符。
 
@@ -786,10 +825,10 @@ pane:
   slots: [46, 47, 48, 50, 51, 52]
 ```
 
-`item.name` / `item.lore` 中的 `%id%` 会被替换为物品库 id。
+`item.name` / `item.lore` 中的 `%id%` 会被替换为物品库 id，`%material%` 为材质名。
 
-> 该界面**尚未接线**（见 [架构文档 §15.2](ARCHITECTURE.md#152-未完成功能缺口)），
-> 配置可正常加载但暂无可达入口。
+界面入口为 **`/exmenu library`**（浏览）与编辑器的"图标: 从物品库选"（选取模式）。
+展示区为界面前 `size - 9` 格（最后一行留给翻页/关闭按钮）。
 
 ---
 
@@ -887,6 +926,40 @@ noTimeLimit: '&c请等待 &e%time% &c秒后再试'
 
 > 💡 这些问题在运行时的表现都是"按钮没反应"，**极难排查** ——
 > 改完菜单后跑一次 `/exmenu check` 是最省事的做法。
+
+---
+
+## 14. EXMenu 对外提供的 PAPI 变量
+
+装了 PlaceholderAPI 后，EXMenu 自身会注册一个变量提供方（expansion），
+把**限购 / 冷却状态**暴露成变量，用于按钮的动态名称 / 描述回显。
+
+| 变量 | 含义 | 未配对应限制时 |
+|---|---|---|
+| `%exmenu_limit_remaining_<id>%` | 剩余可用次数 | `-` |
+| `%exmenu_limit_used_<id>%` | 已用次数 | `0` |
+| `%exmenu_cd_seconds_<id>%` | 冷却剩余秒数（不在冷却中为 0） | `0` |
+
+`<id>` 是按钮的 `id`（可为负数），必须**全局唯一**。配合 `dynamicLore` 使用：
+
+```yaml
+buttons:
+  - slot: 13
+    material: DIAMOND
+    id: -1
+    limit: 3
+    dynamicLore:
+      - '&7今日剩余: &f%exmenu_limit_remaining_-1% &7次'
+      - '&7冷却: &f%exmenu_cd_seconds_-1% &7秒'
+    commands:
+      - '[console] give %player_name% diamond 1'
+```
+
+> **实现说明**：这些变量走 `LimitCache`（只读快照 + 异步刷新的短时缓存）。
+> 变量读取通常发生在渲染 Lore 的主线程，**绝不在读取路径做数据库 IO**。
+> 剩余次数写入后缓存立即失效，下一次渲染即反映新值；冷却剩余秒数用
+> `click_time` 现场计算，精度与墙钟一致，不受缓存陈旧影响。
+> 未安装 PlaceholderAPI 时该 expansion 不注册，菜单功能不受影响。
 
 ---
 

@@ -21,17 +21,22 @@
 ## 特性
 
 - **纯 YAML 菜单** —— `menu/` 下每个文件即一个箱子界面，按钮是 `buttons:` 列表，用 `slot` / `slots` 定位
-- **16 种动作标签** —— `[message]` `[player]` `[console]` `[op]` `[performCommand]` `[dispatchCommand]`
-  `[opPerformCommand]` `[close]` `[open]` `[title]` `[sound]` `[delay]` `[money]` `[point]` `[item]` `[action]`
+- **可视化编辑，不写 YAML 也能建菜单** —— `/exmenu edit` 在界面里点选生成按钮、动作链、限购、条件（自动写回 YAML，首次覆盖前留 `.bak` 备份原文）；`/exmenu settings` 把 `config.yml` 常用开关做成可点击按钮（**保留中文注释**）
+- **22 种动作标签** —— `[message]` `[broadcast]` `[actionbar]` `[player]` `[console]` `[op]` `[performCommand]`
+  `[dispatchCommand]` `[opPerformCommand]` `[close]` `[open]` `[title]` `[sound]` `[delay]` `[money]` `[point]`
+  `[item]` `[effect]` `[heal]` `[feed]` `[exp]` `[action]`
 - **冷却与限购** —— 由数据库原子闸门把关（`UPDATE ... WHERE number < ?`），连点也无法超发次数
+- **EXMenu 对外提供 PAPI 变量** —— `%exmenu_limit_remaining_<id>%`、`%exmenu_cd_seconds_<id>%` 等，实时回显"今日剩余次数"
 - **条件表达式** —— `>=` `<=` `!=` `==` `=` `>` `<`，两侧均支持 PlaceholderAPI 变量
 - **商店** —— `leftBuyRightSell` / `leftSellRightBuy`，价格与数量支持含 `%input%` 的公式
-- **聊天输入流程** —— 向玩家取值，`%input%` 注入动作链
+- **聊天 / 铁砧两种输入** —— 向玩家取值（`inputMethod: CHAT|ANVIL`），`%input%` 注入动作链
 - **二次确认界面** —— 按钮级 `confirm`
 - **权限控制** —— 菜单级与按钮级 `permission` / `notPermission`
+- **物品库界面** —— `/exmenu library` 浏览/取出存入的物品，编辑器从里面选图标
 - **动态入口** —— 每个菜单可绑定命令（`openCommand`）与物品（`openItem`）；可选时钟物品；Shift+F
 - **存储** —— SQLite（WAL，零配置）或 MySQL（HikariCP 连接池）
 - **内置配置校验** —— `/exmenu check` 一次性列出空行、非法标签、重复 id、越界槽位
+- **渲染异步化** —— 开菜单时批量查库移出游戏线程，支持 Folia
 - **Spigot 与 Folia** —— 调度经平台抽象层（`Class.forName` 探测 Folia）
 
 可选前置：**PlaceholderAPI**（变量）与 **Vault** + 经济插件（金钱动作、商店）。
@@ -89,14 +94,14 @@ buttons:
 
 ## 指令
 
-主指令 `/exmenu`（**无别名**），14 个子指令：
+主指令 `/exmenu`（**无别名**），17 个子指令：
 
 | 分组 | 子指令 |
 |---|---|
 | 玩家 | `open <菜单> [玩家]` · `close` · `clock` |
-| 配置 | `reload` · `check [菜单]` |
-| 创作 | `create <菜单>` · `view <菜单>` |
-| 物品库 | `item <槽位>` · `addItem` · `getItem` · `getMaterial` |
+| 配置 | `reload` · `check [菜单]` · `settings` |
+| 创作 | `create <菜单>` · `edit <菜单>` · `view <菜单>` |
+| 物品库 | `item <槽位>` · `addItem` · `getItem` · `getMaterial` · `library` |
 | 维护 | `clear <菜单\|all> [玩家]` · `convert` · `adminOpen <菜单> [玩家]` |
 
 权限节点统一为 `exmenu.<子指令>` —— 完整参数与 Tab 补全见 [docs/COMMANDS.md](docs/COMMANDS.md)。

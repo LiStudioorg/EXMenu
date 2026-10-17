@@ -81,6 +81,9 @@ buttons:
 /exmenu reload              重载配置（改完配置必执行）
 /exmenu open <菜单名>        打开菜单
 /exmenu create <菜单名>      生成菜单骨架
+/exmenu edit <菜单名>        可视化编辑菜单（不用写 YAML）
+/exmenu settings            配置中心界面（点按钮改配置，保留注释）
+/exmenu library             物品库浏览界面
 /exmenu check               校验全部菜单配置
 /exmenu getMaterial         查看手持物品的材质名
 ```
@@ -99,6 +102,7 @@ buttons:
 | **`id`** | 按钮的唯一标识，**限购与冷却功能的前提** |
 | **`commands`** | 点击按钮执行的动作列表，需以 `[类型]` 标签开头 |
 | **条件** | 控制按钮是否显示或是否可点击的表达式 |
+| **可视化编辑** | `/exmenu edit` 全程界面操作；`/exmenu settings` 用按钮改配置 |
 
 ---
 
@@ -113,6 +117,9 @@ buttons:
 5. **`hideFlag` / `hideEnchant` 默认为 `true`**（默认隐藏属性与附魔）
 6. **条件表达式两侧都必须有值** —— 右侧留空会被判定为不满足，按钮对所有人隐藏
 7. **修改带 `id` 的按钮前先删掉 `id` 节点**，改完再加回
+
+> 💡 以上坑大多可以用 **`/exmenu edit <菜单>`**（可视化编辑，自动处理 id/槽位/标签格式）
+> 和 **`/exmenu settings`**（配置中心界面）避开 —— 不想碰 YAML 就用它们。
 
 ---
 

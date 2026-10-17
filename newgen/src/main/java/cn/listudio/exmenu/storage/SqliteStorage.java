@@ -126,15 +126,4 @@ public final class SqliteStorage implements Storage {
     public File dataDirectory() {
         return databaseFile == null ? null : databaseFile.getParentFile();
     }
-
-    /**
-     * 打印一条可诊断的告警，避免调用方重复写日志格式。
-     *
-     * @param plugin  插件实例
-     * @param message 描述
-     * @param e       异常
-     */
-    static void warn(Plugin plugin, String message, Exception e) {
-        plugin.getLogger().log(Level.WARNING, message, e);
-    }
 }

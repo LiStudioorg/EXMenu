@@ -162,6 +162,14 @@ public class MenuButtonParam {
     /** 输入类型枚举名。 */
     private String inputType;
 
+    /**
+     * 输入通道：{@code CHAT}（聊天栏，默认）或 {@code ANVIL}（铁砧界面）。
+     *
+     * <p>铁砧输入不需要占用聊天事件、天然不进公共聊天，对新手更直观；
+     * 聊天输入保留为默认，避免升级行为变化。
+     */
+    private String inputMethod;
+
     /** 点击时该按钮的动作类型：{@code left} / {@code right} / {@code middle}。 */
     private List<String> actionsLeft = new ArrayList<>();
 
@@ -540,6 +548,20 @@ public class MenuButtonParam {
         this.inputType = inputType;
     }
 
+    /** 输入通道：{@code CHAT} / {@code ANVIL}；null 表示默认 CHAT。 */
+    public String getInputMethod() {
+        return inputMethod;
+    }
+
+    public void setInputMethod(String inputMethod) {
+        this.inputMethod = inputMethod;
+    }
+
+    /** 该按钮是否走铁砧输入通道。 */
+    public boolean isAnvilInput() {
+        return "ANVIL".equalsIgnoreCase(inputMethod);
+    }
+
     /** 取玩家本次输入的值；未输入过时返回空串（永不为 null）。 */
     public String getInputValue() {
         return inputValue == null ? "" : inputValue;
@@ -639,28 +661,10 @@ public class MenuButtonParam {
     }
 
     /**
-     * 是否有任何限制配置。
-     *
-     * <p>{@code id == 0} 时一律返回 false —— 这是 id 双语义的关键：
-     * id 为 0 的按钮不参与冷却与次数记录，配置里的 cd/limit 会被忽略。
-     *
-     * @return true 表示需要读写限制记录
-     */
-    public boolean hasLimit() {
-        return id != 0 && (cd > 0 || limit > 0 || cdHide || limitHide);
-    }
-
-    /**
-     * 该按钮是否需要落库（用于决定是否参与批量查询）。
-     *
-     * @return true 表示 {@code id != 0}
-     */
-    public boolean isPersistent() {
-        return id != 0;
-    }
-
-    /**
      * 取实际生效的失败音效。
+     *
+     * <p>历史上的 {@code hasLimit()} / {@code isPersistent()} 两个便捷判断
+     * 无任何调用点（限制判断都直接读 cd/limit 字段），已删除。
      *
      * @return 失败音效字符串，可能为空
      */
@@ -741,6 +745,7 @@ public class MenuButtonParam {
         copy.confirm = confirm;
         copy.input = input;
         copy.inputType = inputType;
+        copy.inputMethod = inputMethod;
         copy.inputValue = inputValue;
         copy.numberClaimed = numberClaimed;
         copy.dynamic = dynamic;

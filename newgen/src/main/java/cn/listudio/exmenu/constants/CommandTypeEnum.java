@@ -60,6 +60,24 @@ public enum CommandTypeEnum {
     /** 给玩家物品。 */
     ITEM("item", "给予物品"),
 
+    /** 全服广播消息。 */
+    BROADCAST("broadcast", "全服广播"),
+
+    /** 发送动作栏消息。 */
+    ACTIONBAR("actionbar", "动作栏消息"),
+
+    /** 给予玩家药水效果。 */
+    EFFECT("effect", "给予效果"),
+
+    /** 回满玩家生命值。 */
+    HEAL("heal", "回满生命"),
+
+    /** 回满玩家饱食度。 */
+    FEED("feed", "回满饱食度"),
+
+    /** 给予玩家经验（等级或经验值）。 */
+    EXP("exp", "给予经验"),
+
     /** 执行一段 Kether/原版命令（保留扩展位）。 */
     ACTION("action", "自定义动作");
 

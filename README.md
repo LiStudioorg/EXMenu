@@ -22,19 +22,27 @@ like and what a button does in plain YAML files; the plugin renders the GUI and 
 ## Features
 
 - **Pure-YAML menus** — every file in `menu/` is one chest GUI; buttons are a `buttons:` list with `slot` / `slots`
-- **16 action tags** — `[message]` `[player]` `[console]` `[op]` `[performCommand]` `[dispatchCommand]`
-  `[opPerformCommand]` `[close]` `[open]` `[title]` `[sound]` `[delay]` `[money]` `[point]` `[item]` `[action]`
+- **Visual editing, no YAML required** — `/exmenu edit` builds buttons, action chains, limits and conditions
+  in a GUI (writes back to YAML automatically, with a one-time `.bak` of the commented original);
+  `/exmenu settings` turns common `config.yml` switches into clickable buttons (comments preserved)
+- **22 action tags** — `[message]` `[broadcast]` `[actionbar]` `[player]` `[console]` `[op]` `[performCommand]`
+  `[dispatchCommand]` `[opPerformCommand]` `[close]` `[open]` `[title]` `[sound]` `[delay]` `[money]` `[point]`
+  `[item]` `[effect]` `[heal]` `[feed]` `[exp]` `[action]`
 - **Cooldowns & per-player purchase limits** — enforced by an atomic database gate
   (`UPDATE ... WHERE number < ?`), so rapid clicks cannot over-spend a limit
+- **EXMenu exposes its own PAPI placeholders** — `%exmenu_limit_remaining_<id>%`,
+  `%exmenu_cd_seconds_<id>%` etc. for live "remaining claims" display
 - **Condition expressions** — `>=` `<=` `!=` `==` `=` `>` `<` with PlaceholderAPI variables on both sides
 - **Shops** — `leftBuyRightSell` / `leftSellRightBuy`, prices and quantities as formulas with `%input%`
-- **Chat-input flow** — ask the player for a value, `%input%` substitutes it into the action chain
+- **Chat or anvil input** — ask the player for a value (`inputMethod: CHAT|ANVIL`), `%input%` substitutes it into the action chain
 - **Confirm dialogs** — per-button second confirmation GUI
 - **Permission control** — menu-level, per-button `permission` / `notPermission`
+- **Item library GUI** — `/exmenu library` browses and retrieves stored items; the editor picks icons from it
 - **Dynamic entries** — bind commands (`openCommand`) and items (`openItem`) per menu; optional clock item; Shift+F
 - **Storage** — SQLite (WAL, zero-config) or MySQL (HikariCP pools)
 - **Built-in config validator** — `/exmenu check` lists blank action lines, unknown tags, duplicate ids
   and out-of-range slots in one pass
+- **Async-friendly rendering** — menu opens load the database off the game thread; Folia-ready
 - **Spigot & Folia** — scheduling goes through a platform abstraction (`Class.forName` Folia detection)
 
 Optional integrations: **PlaceholderAPI** (variables) and **Vault** + an economy plugin (money actions, shops).
@@ -93,14 +101,14 @@ Notes that bite most often: never leave a blank line inside `commands` (it abort
 
 ## Commands
 
-Main command `/exmenu` (no aliases), 14 subcommands:
+Main command `/exmenu` (no aliases), 17 subcommands:
 
 | Group | Subcommands |
 |---|---|
 | Players | `open <menu> [player]` · `close` · `clock` |
-| Config | `reload` · `check [menu]` |
-| Authoring | `create <menu>` · `view <menu>` |
-| Item library | `item <slot>` · `addItem` · `getItem` · `getMaterial` |
+| Config | `reload` · `check [menu]` · `settings` |
+| Authoring | `create <menu>` · `edit <menu>` · `view <menu>` |
+| Item library | `item <slot>` · `addItem` · `getItem` · `getMaterial` · `library` |
 | Maintenance | `clear <menu\|all> [player]` · `convert` · `adminOpen <menu> [player]` |
 
 Permissions are `exmenu.<subcommand>` — full table, parameters and tab-completion:

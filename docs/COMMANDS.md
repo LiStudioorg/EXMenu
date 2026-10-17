@@ -41,8 +41,12 @@
 | `convert` | `/exmenu convert` | `exmenu.convert` | OP |
 | `adminOpen` | `/exmenu adminOpen <菜单> [玩家]` | `exmenu.adminOpen` | OP |
 | `check` | `/exmenu check [菜单]` | `exmenu.check` | OP |
+| `edit` | `/exmenu edit <菜单>` | `exmenu.edit` | OP |
+| `settings` | `/exmenu settings` | `exmenu.settings` | OP |
+| `library` | `/exmenu library` | `exmenu.library` | OP |
 
-共 **14 个子指令**。
+共 **17 个子指令**。`edit` / `settings` / `library` 是面向"不想手写 YAML"的
+可视化指令（见[第 4 节](#4-管理指令)）。
 
 **`/exmenu` 无参数**时显示帮助，**不需要任何权限** —— 这样普通玩家打 `/exmenu`
 能看到"你没权限"，而不是"未知命令"，反而更好排查。
@@ -72,6 +76,9 @@
 | `exmenu.convert` | 数据迁移 | op |
 | `exmenu.adminOpen` | 管理员打开菜单 | op |
 | `exmenu.check` | 校验菜单配置 | op |
+| `exmenu.edit` | 可视化编辑菜单 | op |
+| `exmenu.settings` | 打开配置中心 | op |
+| `exmenu.library` | 浏览物品库 | op |
 
 ### 2.1 通配符
 
@@ -326,6 +333,49 @@ permission: 'exmenu.open.vip'
 > 💡 **这是最省事的排错手段。** 上述问题在运行时的表现都是"按钮没反应"，
 > 靠肉眼对着配置猜非常困难。改完菜单后跑一次 `/exmenu check`。
 
+### `/exmenu edit <菜单>`
+
+**可视化菜单编辑器。**
+
+- **权限**：`exmenu.edit`
+- 面向"看不懂 YAML"的用户：菜单标题、大小、按钮、动作链、条件、权限、
+  冷却、限购全部在界面里点选完成，**改一项即时写回菜单文件并生效**。
+
+**交互一览**：
+
+| 操作 | 界面行为 |
+|---|---|
+| 加按钮 | 点主界面的灰色空槽位 |
+| 进属性页 | 点已有按钮的格子 |
+| 改文本（标题/名称/材质名/冷却/数量…） | 弹铁砧输入框：打字 → 点右侧输出格确认；直接关界面 = 取消 |
+| 改描述/动作链/条件/权限 | 行编辑器：点行编辑、Shift+点删行、`+新增一行` |
+| 图标 | 主手物品一键采用 / 输入材质名 / 从物品库选取 |
+| 预览真实效果 | 主界面绿色眼睛按钮；关闭预览自动回到编辑界面 |
+| 删按钮 | 属性页岩浆桶，**需点两次确认** |
+
+> ⚠️ **写盘会丢失 YAML 注释**（Bukkit 序列化器的固有行为）：
+> 首次覆盖保存一个带注释的菜单前，编辑器会自动留一份 `菜单.yml.bak` 备份。
+
+### `/exmenu settings`
+
+**配置中心界面。**
+
+- **权限**：`exmenu.settings`
+- 把 `config.yml` 最常用的项做成可点击按钮：菜单权限开关、时钟物品开关、
+  自动 id、语言轮换、四组 `action.*` 生效键轮换、输入超时（铁砧输入数字）。
+- **改动立即写入 `config.yml` 并就地生效**（等效自动执行了一次 reload + 丢缓存）。
+- 与手改文件不同：写盘走**行内替换**，`config.yml` 里的中文说明**不会丢失**。
+
+### `/exmenu library`
+
+**物品库浏览界面。**
+
+- **权限**：`exmenu.library`
+- 浏览 `/exmenu item` 存入的物品，布局由 `gui/item.yml` 决定。
+- **左键取出 1 个，Shift+左键取出一整组**；超过一页时用配置里的上/下页按钮翻页。
+
+> 💡 编辑器按钮属性页的"图标: 从物品库选"复用的就是这个界面（选取模式）。
+
 ---
 
 ## 5. 动态菜单指令
@@ -353,6 +403,11 @@ openCommand:
 
 命令名冲突时行为不可预期，建议使用独特前缀（如 `exmenushop`、`servermenu`）。
 
+> ⚠️ **当前版本的已知缺口**：`openCommand` 与 `openItem` 的配置虽会被加载，
+> 但消费它们的监听器尚未接线 —— 直接输入 `/shop` 目前**不会**打开菜单。
+> 详见 [架构文档 §15.2](ARCHITECTURE.md#15-已知缺陷与未完成项)。
+> 管理员可用 `/exmenu open <菜单>` 作为过渡方案。
+
 ---
 
 ## 6. 仅玩家可用 / 控制台可用
@@ -362,6 +417,7 @@ openCommand:
 以下子指令在控制台执行时会提示 `playerOnly`：
 
 `close` `clock` `create` `view` `item` `addItem` `getMaterial` `adminOpen`
+`edit` `settings` `library`
 
 `open` 与 `getItem` 在**不带玩家参数**时也仅限玩家。
 
@@ -376,7 +432,7 @@ openCommand:
 | 参数位置 | 补全内容 |
 |---|---|
 | `args[1]`（子指令名） | 全部子指令，**按权限过滤**（无权限的不显示） |
-| `args[2]`（菜单名） | `open` / `view` / `adminOpen` / `addItem` / `clear` / `check` |
+| `args[2]`（菜单名） | `open` / `view` / `adminOpen` / `addItem` / `clear` / `check` / `edit` |
 | `args[2]`（其他） | `clear` 额外补全 `all` |
 | `args[3]` | `open` / `clear` / `adminOpen` / `getItem` 返回空（不干扰玩家名输入） |
 

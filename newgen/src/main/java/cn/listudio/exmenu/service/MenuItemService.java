@@ -165,10 +165,21 @@ public final class MenuItemService {
     }
 
     /**
+     * 单条 {@code IN} 查询允许的最大参数个数。
+     *
+     * <p>SQLite 的变量上限是 999，留足余量取 500；超过就把 id 列表分片，
+     * 多轮查询合并结果 —— 否则极端配置（几百个物品库按钮的巨型菜单）
+     * 会直接把渲染路径打爆。
+     */
+    private static final int IN_CLAUSE_LIMIT = 500;
+
+    /**
      * 批量按 id 查询，返回 id 到物品的映射。
      *
      * <p>这是菜单渲染路径上的关键方法：一个菜单可能有几十个按钮引用物品库，
-     * 逐个查询会造成明显的开菜单延迟。
+     * 逐个查询会造成明显的开菜单延迟。去重用 {@link java.util.LinkedHashSet}
+     * 而不是 {@code List.contains}（后者在按钮较多时是 O(n²)）；
+     * id 数超过 {@link #IN_CLAUSE_LIMIT} 时自动分片。
      *
      * @param ids 主键集合，可为空
      * @return 映射，永不返回 null
@@ -178,9 +189,9 @@ public final class MenuItemService {
         if (ids == null || ids.isEmpty()) {
             return result;
         }
-        List<Integer> distinct = new ArrayList<>();
+        java.util.Set<Integer> distinct = new java.util.LinkedHashSet<>();
         for (Integer id : ids) {
-            if (id != null && id > 0 && !distinct.contains(id)) {
+            if (id != null && id > 0) {
                 distinct.add(id);
             }
         }
@@ -188,16 +199,31 @@ public final class MenuItemService {
             return result;
         }
 
+        List<Integer> all = new ArrayList<>(distinct);
+        for (int from = 0; from < all.size(); from += IN_CLAUSE_LIMIT) {
+            List<Integer> chunk = all.subList(from, Math.min(all.size(), from + IN_CLAUSE_LIMIT));
+            queryInto(result, chunk);
+        }
+        return result;
+    }
+
+    /**
+     * 对一片 id 执行单条 {@code IN} 查询并合并进结果映射。
+     *
+     * @param result 结果映射（就地写入）
+     * @param chunk  不超过 {@link #IN_CLAUSE_LIMIT} 个 id
+     */
+    private void queryInto(Map<Integer, MenuItem> result, List<Integer> chunk) {
         StringBuilder sql = new StringBuilder("SELECT * FROM menu_item WHERE id IN (");
-        for (int i = 0; i < distinct.size(); i++) {
+        for (int i = 0; i < chunk.size(); i++) {
             sql.append(i == 0 ? "?" : ",?");
         }
         sql.append(')');
 
         try (Connection connection = storage.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql.toString())) {
-            for (int i = 0; i < distinct.size(); i++) {
-                statement.setInt(i + 1, distinct.get(i));
+            for (int i = 0; i < chunk.size(); i++) {
+                statement.setInt(i + 1, chunk.get(i));
             }
             try (ResultSet rs = statement.executeQuery()) {
                 while (rs.next()) {
@@ -208,7 +234,6 @@ public final class MenuItemService {
         } catch (SQLException e) {
             logger.log(Level.WARNING, "批量查询物品失败", e);
         }
-        return result;
     }
 
     /**
@@ -234,6 +259,8 @@ public final class MenuItemService {
     /**
      * 删除指定 id 的物品。
      *
+     * <p>超过 {@link #IN_CLAUSE_LIMIT} 时自动分片，避免触到 SQLite 变量上限。
+     *
      * @param ids 主键集合
      * @return 实际删除的行数
      */
@@ -241,31 +268,36 @@ public final class MenuItemService {
         if (ids == null || ids.isEmpty()) {
             return 0;
         }
-        StringBuilder sql = new StringBuilder("DELETE FROM menu_item WHERE id IN (");
         List<Integer> distinct = new ArrayList<>();
         for (Integer id : ids) {
-            if (id != null) {
+            if (id != null && !distinct.contains(id)) {
                 distinct.add(id);
             }
         }
         if (distinct.isEmpty()) {
             return 0;
         }
-        for (int i = 0; i < distinct.size(); i++) {
-            sql.append(i == 0 ? "?" : ",?");
-        }
-        sql.append(')');
 
-        try (Connection connection = storage.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql.toString())) {
-            for (int i = 0; i < distinct.size(); i++) {
-                statement.setInt(i + 1, distinct.get(i));
+        int deleted = 0;
+        for (int from = 0; from < distinct.size(); from += IN_CLAUSE_LIMIT) {
+            List<Integer> chunk = distinct.subList(from, Math.min(distinct.size(), from + IN_CLAUSE_LIMIT));
+            StringBuilder sql = new StringBuilder("DELETE FROM menu_item WHERE id IN (");
+            for (int i = 0; i < chunk.size(); i++) {
+                sql.append(i == 0 ? "?" : ",?");
             }
-            return statement.executeUpdate();
-        } catch (SQLException e) {
-            logger.log(Level.WARNING, "删除物品失败", e);
-            return 0;
+            sql.append(')');
+
+            try (Connection connection = storage.getConnection();
+                 PreparedStatement statement = connection.prepareStatement(sql.toString())) {
+                for (int i = 0; i < chunk.size(); i++) {
+                    statement.setInt(i + 1, chunk.get(i));
+                }
+                deleted += statement.executeUpdate();
+            } catch (SQLException e) {
+                logger.log(Level.WARNING, "删除物品失败", e);
+            }
         }
+        return deleted;
     }
 
     /**
@@ -314,14 +346,5 @@ public final class MenuItemService {
         item.setItemJson(rs.getString("item_json"));
         item.setCreateTime(rs.getLong("create_time"));
         return item;
-    }
-
-    /**
-     * 空结果常量，避免调用方判空。
-     *
-     * @return 空映射
-     */
-    public static Map<Integer, MenuItem> emptyMap() {
-        return Collections.emptyMap();
     }
 }

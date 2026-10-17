@@ -5,14 +5,16 @@
 title: '&8菜单 - 示例'
 
 # 界面大小，必须是 9 的倍数，范围 9~54
-size: 27
+size: 36
 
 # 绑定命令：玩家输入 /mc 即可打开本菜单
+# ⚠️ 当前版本该入口尚未接线（无监听器消费），配置暂不生效 ——
+# 详见 docs/ARCHITECTURE.md §15.2。过渡期请用 /exmenu open example
 openCommand:
   - mc
 
 # 绑定物品：手持该材质右键空气即可打开本菜单
-# （若 config.yml 的 clock.menu 已填写，则此项失效）
+# （若 config.yml 的 clock.menu 已填写，则此项失效；同样待接线）
 openItem:
   - clock
 
@@ -51,21 +53,26 @@ buttons:
     material: DIAMOND
     id: -1
     name: '&a&l限领 3 次'
-    lore:
+    dynamicLore:
       - '&7最多可点击 3 次'
+      # 下面这行需要安装 PlaceholderAPI 才会显示数字，
+      # 没装 PAPI 时会原样显示变量名（不影响功能）
+      - '&7剩余: &f%exmenu_limit_remaining_-1% &7次'
     limit: 3
     commands:
       - '[message] &a领取成功'
       - '[console] give %player_name% diamond 1'
 
   # ---- 带冷却的按钮 ----
+  # 注意：裸数字按【毫秒】计算，带单位的才按秒/分/时 ——
+  # 想要 10 秒请写 10s，别写 10（那是 10 毫秒）
   - slot: 16
     material: CLOCK
     id: -2
     name: '&e&l冷却 10 秒'
     lore:
       - '&7每 10 秒可点击一次'
-    cd: 10
+    cd: 10s
     commands:
       - '[message] &a触发成功'
 
@@ -91,6 +98,33 @@ buttons:
     commands:
       - '[message] &c你确认了此操作'
 
+  # ---- 铁砧输入演示（inputMethod: ANVIL）----
+  # 点击后弹出铁砧界面输入数量，点右侧输出格确认；直接关界面 = 取消
+  - slot: 29
+    material: FEATHER
+    name: '&6&l铁砧输入演示'
+    lore:
+      - '&7输入几个钻石就发几个'
+      - '&7用的是铁砧界面，不是聊天栏'
+    input: '请输入数量'
+    inputType: 'POSITIVE_NUMBER'
+    inputMethod: 'ANVIL'
+    commands:
+      - '[message] &a即将给你 &f%input% &a个钻石'
+      - '[console] give %player_name% diamond %input%'
+
+  # ---- 新动作标签演示 ----
+  - slot: 31
+    material: EXPERIENCE_BOTTLE
+    name: '&a&l新标签演示'
+    lore:
+      - '&7动作栏消息 / 经验 / 药水效果'
+    commands:
+      - '[actionbar] &b这是一条动作栏消息'
+      - '[exp] 1'
+      - '[effect] SPEED:5:1'
+      - '[message] &a已给予 1 级经验与 5 秒速度 I'
+
   # ---- 关闭菜单 ----
   - slot: 24
     material: BARRIER
@@ -103,6 +137,6 @@ buttons:
 # ---- 装饰板：填充边框，避免误点 ----
 pane:
   enable: true
-  slots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 17, 18, 19, 21, 23, 25, 26]
+  slots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 17, 18, 26, 27, 28, 30, 32, 33, 34, 35]
   material: BLACK_STAINED_GLASS_PANE
   name: ' '

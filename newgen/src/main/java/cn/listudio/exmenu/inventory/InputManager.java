@@ -147,7 +147,27 @@ public final class InputManager {
         // 输入值挂在按钮对象上，随会话一起跨线程传递。
         // 不能用 ThreadLocal：这里在聊天事件线程写入，下面在实体线程读取。
         MenuExecutor.setInput(session.getParam(), message);
+        finish(plugin, player, session, executor);
+        return true;
+    }
 
+    /**
+     * 结束一次输入会话并按会话内容执行：确认界面或过限购门槛执行。
+     *
+     * <p>聊天输入与铁砧输入共用这段收尾逻辑。调用前输入值必须已经写入
+     * {@code session.getParam()}（{@link MenuExecutor#setInput}）——
+     * 输入值刻意挂在按钮对象上而不是 {@code ThreadLocal}：输入流程会跨越
+     * 聊天事件线程与实体线程，线程局部变量传不过去。
+     *
+     * <p>本方法可能在异步线程被调用（聊天事件线程），内部统一切回玩家线程执行。
+     *
+     * @param plugin   插件实例
+     * @param player   玩家
+     * @param session  输入会话
+     * @param executor 执行器
+     */
+    public static void finish(Plugin plugin, Player player, InputSession session,
+                              MenuExecutor executor) {
         // 回到玩家所在线程执行 —— 聊天事件可能在异步线程触发，
         // 而动作链里的 openInventory / performCommand 都要求主线程
         SchedulerUtil.runAtEntity(plugin, player, () -> {
@@ -162,7 +182,6 @@ public final class InputManager {
             executor.executeWithLimitGate(player, session.getParam(),
                     MenuGuiManager.wrap(plugin, session.getSourceGui(), player, session.getParam()));
         });
-        return true;
     }
 
     /**

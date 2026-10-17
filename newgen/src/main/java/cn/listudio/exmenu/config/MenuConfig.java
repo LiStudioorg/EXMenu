@@ -38,6 +38,9 @@ public final class MenuConfig implements cn.listudio.exmenu.core.MenuChecker.Con
     /** 是否检查更新。 */
     private boolean checkUpdate = true;
 
+    /** 首次启动时是否给管理员发送引导消息。 */
+    private boolean firstRunHelp = true;
+
     /** 时钟物品配置。 */
     private boolean clockEnable;
     private String clockMenu;
@@ -108,6 +111,7 @@ public final class MenuConfig implements cn.listudio.exmenu.core.MenuChecker.Con
         this.autoCreateId = fresh.autoCreateId;
         this.adminOpenPermission = fresh.adminOpenPermission;
         this.checkUpdate = fresh.checkUpdate;
+        this.firstRunHelp = fresh.firstRunHelp;
         this.permission = fresh.permission;
         this.inputTimeout = fresh.inputTimeout;
 
@@ -156,6 +160,7 @@ public final class MenuConfig implements cn.listudio.exmenu.core.MenuChecker.Con
         config.autoCreateId = root.getBoolean("autoCreateId", true);
         config.adminOpenPermission = root.getString("adminOpenPermission", "exmenu.adminOpen");
         config.checkUpdate = root.getBoolean("isCheckUpdate", true);
+        config.firstRunHelp = root.getBoolean("firstRunHelp", true);
         config.permission = root.getBoolean("permission", false);
         config.inputTimeout = root.getInt("inputTimeout", 30);
 
@@ -340,6 +345,15 @@ public final class MenuConfig implements cn.listudio.exmenu.core.MenuChecker.Con
 
     public boolean isCheckUpdate() {
         return checkUpdate;
+    }
+
+    /**
+     * 首次启动是否向管理员发送引导消息。
+     *
+     * @return true 表示发送
+     */
+    public boolean isFirstRunHelp() {
+        return firstRunHelp;
     }
 
     public boolean isClockEnable() {

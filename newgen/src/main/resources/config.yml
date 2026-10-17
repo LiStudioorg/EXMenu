@@ -44,3 +44,6 @@ action:
 
 # 是否检查更新
 isCheckUpdate: false
+
+# 首次启动时是否给管理员发送引导消息（只发一次）
+firstRunHelp: true

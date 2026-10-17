@@ -68,6 +68,18 @@ public final class MenuPlugin extends JavaPlugin implements ConfigProvider {
     /** 物品库 DAO。 */
     private MenuItemService itemService;
 
+    /** PAPI 状态变量读取的限购/冷却缓存。 */
+    private cn.listudio.exmenu.core.LimitCache limitCache;
+
+    /** 物品库浏览界面。 */
+    private cn.listudio.exmenu.inventory.ItemLibraryGuiManager libraryGui;
+
+    /** 配置中心界面。 */
+    private cn.listudio.exmenu.inventory.SettingsGuiManager settingsGui;
+
+    /** 可视化菜单编辑器。 */
+    private cn.listudio.exmenu.inventory.EditGuiManager editGui;
+
     @Override
     public void onEnable() {
         // 1. 配置
@@ -98,6 +110,18 @@ public final class MenuPlugin extends JavaPlugin implements ConfigProvider {
         // 界面管理器同时是 ConfigProvider —— 它内部转发给主类持有的快照，
         // 这样 reload 替换快照后界面层立刻取到新值
         this.guiManager = new MenuGuiManager(this, this, itemService, limitService, executor);
+        this.libraryGui = new cn.listudio.exmenu.inventory.ItemLibraryGuiManager(
+                this, this, itemService);
+        this.settingsGui = new cn.listudio.exmenu.inventory.SettingsGuiManager(
+                this, this, guiManager);
+        this.editGui = new cn.listudio.exmenu.inventory.EditGuiManager(
+                this, this, guiManager, libraryGui);
+        editGui.setItemService(itemService);
+
+        // PAPI 状态变量的只读缓存：写库后失效，读取永不阻塞
+        this.limitCache = new cn.listudio.exmenu.core.LimitCache(this, limitService);
+        executor.setLimitCache(limitCache);
+        guiManager.setLimitCache(limitCache);
 
         // 5. 接线：执行器需要界面层来打开菜单与执行子动作
         executor.setGuiOpener(guiManager);
@@ -119,7 +143,32 @@ public final class MenuPlugin extends JavaPlugin implements ConfigProvider {
         registerCommand();
         registerListeners();
 
+        // 7. PAPI 变量（PAPI 不在位时静默跳过；重载顺序无关 —— softdepend 保证
+        //    PAPI 先于本插件启用）
+        registerExpansion();
+
         getLogger().info("EXMenu 已启用，存储: " + storage.dialect());
+    }
+
+    /**
+     * 向 PlaceholderAPI 注册 EXMenu 状态变量。
+     *
+     * <p>独立类只在 PAPI 存在时才被类加载 —— {@code EXMenuExpansion} 继承
+     * {@code PlaceholderExpansion}，在没有 PAPI 的服务端上直接实例化会
+     * {@code NoClassDefFoundError}，因此探测与实例化都必须以它为前提。
+     */
+    private void registerExpansion() {
+        if (!PlaceholderUtil.isEnabled()) {
+            return;
+        }
+        try {
+            new cn.listudio.exmenu.expansion.EXMenuExpansion(
+                    getDescription().getVersion(), limitCache, guiManager).register();
+            getLogger().info("已注册 PAPI 变量: %exmenu_limit_remaining_<id>% 等");
+        } catch (RuntimeException | LinkageError e) {
+            // 注册失败只影响展示变量，菜单功能不受损
+            getLogger().warning("PAPI 变量注册失败: " + e.getMessage());
+        }
     }
 
     /**
@@ -211,7 +260,7 @@ public final class MenuPlugin extends JavaPlugin implements ConfigProvider {
             return;
         }
         MainCommand handler = new MainCommand(this, this, guiManager, executor,
-                itemService, limitService);
+                itemService, limitService, libraryGui, settingsGui, editGui);
         command.setExecutor(handler);
         command.setTabCompleter(handler);
     }
@@ -224,6 +273,24 @@ public final class MenuPlugin extends JavaPlugin implements ConfigProvider {
                 new ClockInteractListener(this, this, executor), this);
 
         getServer().getPluginManager().registerEvents(new PlayerQuitListener(), this);
+
+        // 首次启动引导（只发给第一个进服的管理员，一次）
+        getServer().getPluginManager().registerEvents(
+                new cn.listudio.exmenu.listener.OnboardingListener(this, this), this);
+
+        // 玩家退出时清掉 PAPI 缓存条目，避免长时间运行后 UUID 表无界增长
+        getServer().getPluginManager().registerEvents(
+                new org.bukkit.event.Listener() {
+                    @org.bukkit.event.EventHandler(priority = org.bukkit.event.EventPriority.MONITOR)
+                    public void onQuit(org.bukkit.event.player.PlayerQuitEvent event) {
+                        if (limitCache != null) {
+                            limitCache.remove(event.getPlayer().getUniqueId());
+                        }
+                    }
+                }, this);
+
+        // 编辑器的"预览关闭后回到编辑界面"依赖关闭事件；退出清理会话也在其中
+        getServer().getPluginManager().registerEvents(editGui, this);
 
         // 聊天输入：把静态的 InputManager 适配成监听器要求的处理器接口
         getServer().getPluginManager().registerEvents(new ChatInputListener(new ChatInputListener.ChatHandler() {

@@ -394,6 +394,19 @@ public final class MenuExecutor {
     // 限制记录
     // ------------------------------------------------------------------
 
+    /** 限购原子门槛占位成功后要失效的缓存（PAPI 状态回显即时性用，可为 null）。 */
+    private cn.listudio.exmenu.core.LimitCache limitCache;
+
+    /**
+     * 注入限制缓存（可选）。写入使用记录后失效对应玩家缓存，
+     * 使 {@code %exmenu_limit_*%} 变量在下一次渲染即反映新状态。
+     *
+     * @param limitCache 限制缓存
+     */
+    public void setLimitCache(cn.listudio.exmenu.core.LimitCache limitCache) {
+        this.limitCache = limitCache;
+    }
+
     /**
      * 记录本次使用。
      *
@@ -433,6 +446,10 @@ public final class MenuExecutor {
             }
             if (needNumber) {
                 limitService.addNumber(player.getName(), player.getUniqueId(), param.getId(), 1);
+            }
+            // 使用记录变了 → PAPI 状态变量下次读取拉新值
+            if (limitCache != null) {
+                limitCache.invalidate(player.getUniqueId());
             }
         });
     }
@@ -477,8 +494,12 @@ public final class MenuExecutor {
                     return;
                 }
                 param.setNumberClaimed(true);
-                MenuLimit fresh = limitService.find(player.getUniqueId(), param.getId());
-                execute(player, param, fresh, gui);
+                if (limitCache != null) {
+                    limitCache.invalidate(player.getUniqueId());
+                }
+                // execute() 不消费 limit 快照（校验已前置、计数走原子累加），
+                // 这里不再同步回查数据库 —— 既省一次往返，也避免在实体线程做阻塞 IO
+                execute(player, param, null, gui);
             });
         });
     }
@@ -625,6 +646,27 @@ public final class MenuExecutor {
                 break;
             case ITEM:
                 handleItem(player, body);
+                break;
+            case BROADCAST:
+                Bukkit.broadcastMessage(TextUtil.color(body));
+                break;
+            case ACTIONBAR:
+                cn.listudio.exmenu.util.ActionBarUtil.send(player, body);
+                break;
+            case EFFECT:
+                handleEffect(player, body);
+                break;
+            case HEAL:
+                player.setHealth(player.getMaxHealth());
+                player.setFireTicks(0);
+                break;
+            case FEED:
+                player.setFoodLevel(20);
+                player.setSaturation(20F);
+                player.setExhaustion(0F);
+                break;
+            case EXP:
+                handleExp(player, body);
                 break;
             case ACTION:
                 // [action] 是对"再执行一个按钮"的支持，格式：菜单名:按钮id
@@ -896,45 +938,68 @@ public final class MenuExecutor {
     }
 
     /**
-     * 解析并校验 {@code %input%} 的存在性。
+     * 处理 {@code [effect]}：给予药水效果。
      *
-     * @param actions 动作列表
-     * @return true 表示用到了输入值
-     */
-    public static boolean needsInput(List<String> actions) {
-        if (actions == null) {
-            return false;
-        }
-        for (String action : actions) {
-            if (action != null && action.contains("%input%")) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * 便捷方法：按 id 直接记录一次使用。
-     *
-     * <p>供确认界面的"确认"按钮调用 —— 那条路径走的是自己的流程，
-     * 不复用 {@link #execute}。
+     * <p>格式 {@code 效果名:秒数:等级}，秒数默认 10、等级默认 1；
+     * 多组用逗号分隔，例如 {@code SPEED:10:1,JUMP:5:2}。
      *
      * @param player 玩家
-     * @param param  按钮
+     * @param body   配置文本
      */
-    public void recordUsage(Player player, MenuButtonParam param) {
-        applyLimits(player, param);
+    @SuppressWarnings("deprecation")
+    private void handleEffect(Player player, String body) {
+        if (TextUtil.isEmpty(body)) {
+            player.sendMessage(LangUtil.format("configError", "%reason%", "effect 缺少效果名"));
+            return;
+        }
+        for (String entry : body.split(",")) {
+            String trimmed = entry.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            List<String> parts = TextUtil.split(trimmed, ":");
+            org.bukkit.potion.PotionEffectType type =
+                    org.bukkit.potion.PotionEffectType.getByName(parts.get(0).toUpperCase());
+            if (type == null) {
+                player.sendMessage(LangUtil.format("configError", "%reason%", "无法识别的效果: " + parts.get(0)));
+                return;
+            }
+            int seconds = parts.size() > 1 ? (int) parseFloat(parts.get(1), 10F) : 10;
+            int level = parts.size() > 2 ? (int) parseFloat(parts.get(2), 1F) : 1;
+            int ticks = Math.max(1, seconds) * 20;
+            int amplifier = Math.max(0, level - 1);
+            player.addPotionEffect(new org.bukkit.potion.PotionEffect(type, ticks, amplifier));
+        }
     }
 
     /**
-     * 调试用：列出全部已知动作标签。
+     * 处理 {@code [exp]}：给予经验。
      *
-     * @return 标签列表
+     * <p>默认给<b>等级</b>（{@code [exp] 2} 加 2 级）；写 {@code points:100}
+     * 则给经验值。支持负数（扣）。
+     *
+     * @param player 玩家
+     * @param body   配置文本
      */
-    public static List<String> knownTags() {
-        return Arrays.asList(
-                "[message]", "[player]", "[console]", "[op]", "[opPerformCommand]",
-                "[performCommand]", "[dispatchCommand]", "[close]", "[open]", "[title]",
-                "[sound]", "[delay]", "[money]", "[point]", "[item]", "[action]");
+    private void handleExp(Player player, String body) {
+        String text = body.trim().toLowerCase();
+        boolean points = false;
+        if (text.startsWith("points:") || text.startsWith("pts:")) {
+            points = true;
+            text = text.substring(text.indexOf(':') + 1).trim();
+        } else if (text.startsWith("levels:")) {
+            text = text.substring("levels:".length()).trim();
+        }
+        Double value = TextUtil.evaluate(PlaceholderUtil.set(player, text));
+        if (value == null) {
+            player.sendMessage(LangUtil.format("configError", "%reason%", "exp 数量非法: " + body));
+            return;
+        }
+        int amount = (int) Math.round(value);
+        if (points) {
+            player.giveExp(amount);
+        } else {
+            player.giveExpLevels(amount);
+        }
     }
 }

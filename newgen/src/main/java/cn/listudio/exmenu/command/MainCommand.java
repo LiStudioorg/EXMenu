@@ -64,6 +64,9 @@ public final class MainCommand implements CommandExecutor, TabCompleter {
         PERMISSIONS.put("convert", "exmenu.convert");
         PERMISSIONS.put("adminOpen", "exmenu.adminOpen");
         PERMISSIONS.put("check", "exmenu.check");
+        PERMISSIONS.put("library", "exmenu.library");
+        PERMISSIONS.put("settings", "exmenu.settings");
+        PERMISSIONS.put("edit", "exmenu.edit");
     }
 
     private final Plugin plugin;
@@ -72,6 +75,9 @@ public final class MainCommand implements CommandExecutor, TabCompleter {
     private final MenuExecutor executor;
     private final MenuItemService itemService;
     private final MenuLimitService limitService;
+    private final cn.listudio.exmenu.inventory.ItemLibraryGuiManager libraryGui;
+    private final cn.listudio.exmenu.inventory.SettingsGuiManager settingsGui;
+    private final cn.listudio.exmenu.inventory.EditGuiManager editGui;
 
     /**
      * 构造。
@@ -82,15 +88,24 @@ public final class MainCommand implements CommandExecutor, TabCompleter {
      * @param executor       执行器
      * @param itemService    物品库服务
      * @param limitService   限制服务
+     * @param libraryGui     物品库浏览界面管理器
+     * @param settingsGui    配置中心界面管理器
+     * @param editGui        可视化菜单编辑器
      */
     public MainCommand(Plugin plugin, ConfigProvider configProvider, MenuGuiManager guiManager,
-                       MenuExecutor executor, MenuItemService itemService, MenuLimitService limitService) {
+                       MenuExecutor executor, MenuItemService itemService, MenuLimitService limitService,
+                       cn.listudio.exmenu.inventory.ItemLibraryGuiManager libraryGui,
+                       cn.listudio.exmenu.inventory.SettingsGuiManager settingsGui,
+                       cn.listudio.exmenu.inventory.EditGuiManager editGui) {
         this.plugin = plugin;
         this.configProvider = configProvider;
         this.guiManager = guiManager;
         this.executor = executor;
         this.itemService = itemService;
         this.limitService = limitService;
+        this.libraryGui = libraryGui;
+        this.settingsGui = settingsGui;
+        this.editGui = editGui;
     }
 
     @Override
@@ -104,7 +119,7 @@ public final class MainCommand implements CommandExecutor, TabCompleter {
         }
 
         String sub = args[0].toLowerCase(Locale.ROOT);
-        String permission = PERMISSIONS.get(sub);
+        String permission = permissionFor(sub);
         if (permission == null) {
             LangUtil.send(sender, "noCommandPermission");
             return true;
@@ -143,6 +158,12 @@ public final class MainCommand implements CommandExecutor, TabCompleter {
                 return handleAdminOpen(sender, args);
             case "check":
                 return handleCheck(sender, args);
+            case "library":
+                return handleLibrary(sender);
+            case "settings":
+                return handleSettings(sender);
+            case "edit":
+                return handleEdit(sender, args);
             default:
                 sendHelp(sender);
                 return true;
@@ -345,6 +366,12 @@ public final class MainCommand implements CommandExecutor, TabCompleter {
                 sample.put("name", "&e示例按钮");
                 sample.put("lore", Arrays.asList("&7点我执行命令"));
                 sample.put("slot", 13);
+                // autoCreateId 开关：历史上 handleCreate 无视它，文档 §15.2-11 记录过这一条。
+                // 开启时给骨架按钮一个负数 id，让 cd/limit 开箱即可配可用。
+                MenuConfig config = configProvider.get();
+                if (config == null || config.isAutoCreateId()) {
+                    sample.put("id", -1);
+                }
                 sample.put("commands", Collections.singletonList("[message] &a你好, %player_name%"));
                 buttons.add(sample);
                 yml.set("buttons", buttons);
@@ -791,6 +818,71 @@ public final class MainCommand implements CommandExecutor, TabCompleter {
     }
 
     /**
+     * {@code /exmenu library}：打开物品库浏览界面。
+     *
+     * <p>数据来自 {@code menu_item} 表（{@code /exmenu item} 存进去的那些），
+     * 左键取出 1 个、Shift+左键取出一整组。界面布局由 {@code gui/item.yml} 决定。
+     *
+     * @param sender 发送者
+     * @return true
+     */
+    private boolean handleLibrary(CommandSender sender) {
+        Player player = asPlayer(sender);
+        if (player == null) {
+            return true;
+        }
+        libraryGui.openBrowse(player);
+        return true;
+    }
+
+    /**
+     * {@code /exmenu settings}：打开配置中心界面。
+     *
+     * <p>面向"不想打开 config.yml 对着键名猜含义"的管理员：
+     * 常用开关全部做成可点击按钮，改完即时写盘并生效。
+     *
+     * @param sender 发送者
+     * @return true
+     */
+    private boolean handleSettings(CommandSender sender) {
+        Player player = asPlayer(sender);
+        if (player == null) {
+            return true;
+        }
+        settingsGui.open(player);
+        return true;
+    }
+
+    /**
+     * {@code /exmenu edit <菜单>}：打开可视化菜单编辑器。
+     *
+     * <p>面向"看不懂 YAML"的用户：菜单结构、按钮、动作链全在界面里改，
+     * 改动即时写回菜单文件并生效。首次覆盖保存前会自动留 {@code .bak} 备份。
+     *
+     * @param sender 发送者
+     * @param args   参数
+     * @return true
+     */
+    private boolean handleEdit(CommandSender sender, String[] args) {
+        Player player = asPlayer(sender);
+        if (player == null) {
+            return true;
+        }
+        if (args.length < 2) {
+            LangUtil.send(sender, "noMenu");
+            return true;
+        }
+        String menu = normalizeMenuName(args[1]);
+        MenuConfig config = configProvider.get();
+        if (config == null || config.getMenu(menu) == null) {
+            LangUtil.send(sender, "noMenu");
+            return true;
+        }
+        editGui.open(player, menu);
+        return true;
+    }
+
+    /**
      * {@code /exmenu check [菜单]}：校验菜单配置。
      *
      * <p>这个子命令本身不是原版功能，但它是"避免配置错误"最有效的手段：
@@ -845,6 +937,29 @@ public final class MainCommand implements CommandExecutor, TabCompleter {
         // 原版这里用断言直接把控制台"拒之门外"，报的是参数错误，
         // 管理员会以为是命令写错了。明确说明是"仅玩家可用"更好排查。
         LangUtil.send(sender, "playerOnly");
+        return null;
+    }
+
+    /**
+     * 按小写子命令名查权限节点。
+     *
+     * <p>历史缺陷：本类曾直接 {@code PERMISSIONS.get(sub)}，而 map 的键是
+     * camelCase（addItem/getItem/getMaterial/adminOpen），{@code sub} 已被
+     * 强制小写 —— 四个子命令<b>永远查不到权限、被拒于"没有权限"</b>。
+     * 文档宣称已修复但代码里并未生效，本轮修正。
+     *
+     * <p>Tab 补全仍需要 camelCase 的展示形式，因此不改 map 本身，
+     * 改为大小写不敏感查找（14+ 项的线性扫描，成本可忽略）。
+     *
+     * @param sub 已转小写的子命令名
+     * @return 权限节点；未知子命令返回 null
+     */
+    private static String permissionFor(String sub) {
+        for (Map.Entry<String, String> entry : PERMISSIONS.entrySet()) {
+            if (entry.getKey().equalsIgnoreCase(sub)) {
+                return entry.getValue();
+            }
+        }
         return null;
     }
 
@@ -928,6 +1043,9 @@ public final class MainCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§e/exmenu clear <菜单|all> [玩家] §7- 清理限制");
         sender.sendMessage("§e/exmenu adminOpen <菜单> [玩家] §7- 管理员打开");
         sender.sendMessage("§e/exmenu check [菜单] §7- 校验菜单配置");
+        sender.sendMessage("§e/exmenu library §7- 浏览物品库");
+        sender.sendMessage("§e/exmenu settings §7- 打开配置中心");
+        sender.sendMessage("§e/exmenu edit <菜单> §7- 可视化编辑菜单");
     }
 
     @Override
@@ -950,7 +1068,8 @@ public final class MainCommand implements CommandExecutor, TabCompleter {
             // 导致这两个子指令的菜单名补全静默失效。
             String sub = args[0].toLowerCase(Locale.ROOT);
             if ("open".equals(sub) || "view".equals(sub) || "adminopen".equals(sub)
-                    || "additem".equals(sub) || "clear".equals(sub) || "check".equals(sub)) {
+                    || "additem".equals(sub) || "clear".equals(sub) || "check".equals(sub)
+                    || "edit".equals(sub)) {
                 MenuConfig config = configProvider.get();
                 List<String> names = new ArrayList<>();
                 if (config != null) {

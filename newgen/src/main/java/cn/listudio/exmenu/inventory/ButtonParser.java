@@ -124,6 +124,7 @@ public final class ButtonParser {
         param.setConfirm(section.getBoolean("confirm", false));
         String input = section.getString("input");
         param.setInput(input);
+        param.setInputMethod(section.getString("inputMethod"));
         if (TextUtil.isNotEmpty(input)) {
             // input 既可以写类型名（NUMBER），也可以写提示文本；类型另用 inputType 指定
             InputTypeEnum inputType = InputTypeEnum.parse(
