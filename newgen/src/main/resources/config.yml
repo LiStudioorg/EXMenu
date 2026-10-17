@@ -1,0 +1,46 @@
+# 语言文件 [可选 中文简体:zh_CN;中文繁體:zh_TW;English:en_US]
+language: zh_CN
+
+# 禁止打开菜单的世界
+noWorld:
+  - "notWorld"
+
+# 使用 /plm create 创建菜单时是否自动生成 id
+autoCreateId: true
+
+# 是否需要菜单打开权限。
+# true 时：菜单文件里的 permission 节点生效，玩家需持有该权限才能打开
+permission: false
+
+# 聊天输入等待超时（秒），<= 0 表示不超时
+inputTimeout: 30
+
+# 时钟物品：进服赠送 / /plm clock 取回
+clock:
+  # 是否开启
+  enable: false
+  # 时钟物品打开的菜单。
+  # 一旦填写，menu/ 下所有 openItem 配置将失效，只使用这个
+  menu: example.yml
+  # 物品材质
+  item: CLOCK
+  # 物品显示名
+  name: '&e菜单'
+  # 放置槽位；该槽位已有物品时改为放进背包
+  slot: 8
+
+# Shift+F 打开菜单（1.9+）
+shift:
+  F:
+    enable: false
+    menu: example.yml
+
+# 限制生效的点击类型 ALL 全部 / LEFT 左键 / RIGHT 右键 / MIDDLE 中键
+action:
+  cd: ALL
+  limit: ALL
+  money: ALL
+  point: ALL
+
+# 是否检查更新
+isCheckUpdate: false

@@ -1,0 +1,78 @@
+name: PlayerMenuNG
+main: cn.handyplus.menu.ng.MenuPlugin
+version: ${project.version}
+author: handy
+api-version: '1.13'
+description: YAML 驱动的菜单插件（Spigot + Folia）
+website: https://ricedoc.handyplus.cn/wiki/PlayerMenu/
+folia-supported: true
+softdepend:
+  - PlaceholderAPI
+  - Vault
+commands:
+  playerMenu:
+    description: 玩家菜单插件
+    usage: /playerMenu <子命令>
+    aliases:
+      - plm
+permissions:
+  playerMenu.*:
+    description: 玩家菜单插件的全部权限
+    default: op
+    children:
+      playerMenu.open: true
+      playerMenu.close: true
+      playerMenu.clock: true
+      playerMenu.reload: true
+      playerMenu.create: true
+      playerMenu.view: true
+      playerMenu.item: true
+      playerMenu.addItem: true
+      playerMenu.getItem: true
+      playerMenu.getMaterial: true
+      playerMenu.clear: true
+      playerMenu.convert: true
+      playerMenu.adminOpen: true
+      playerMenu.check: true
+  playerMenu.open:
+    description: 打开菜单
+    default: true
+  playerMenu.close:
+    description: 关闭菜单
+    default: true
+  playerMenu.clock:
+    description: 取回菜单时钟
+    default: true
+  playerMenu.reload:
+    description: 重载配置
+    default: op
+  playerMenu.create:
+    description: 创建菜单
+    default: op
+  playerMenu.view:
+    description: 预览菜单
+    default: op
+  playerMenu.item:
+    description: 存入物品库
+    default: op
+  playerMenu.addItem:
+    description: 设置按钮图标
+    default: op
+  playerMenu.getItem:
+    description: 取出物品库物品
+    default: op
+  playerMenu.getMaterial:
+    description: 获取材质名
+    default: op
+  playerMenu.clear:
+    description: 清理限制数据
+    default: op
+  playerMenu.convert:
+    description: 数据迁移
+    default: op
+  playerMenu.adminOpen:
+    description: 管理员打开菜单
+    default: op
+  playerMenu.check:
+    description: 校验菜单配置
+    default: op

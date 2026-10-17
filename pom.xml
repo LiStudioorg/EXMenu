@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>cn.handyplus.menu</groupId>
+    <artifactId>PlayerMenu-Parent</artifactId>
+    <version>1.0.0</version>
+    <packaging>pom</packaging>
+
+    <name>PlayerMenu-Parent</name>
+    <description>PlayerMenuNG 聚合构建入口</description>
+
+    <!--
+        本仓库只有一个模块：newgen（PlayerMenuNG）。
+
+        历史说明：仓库根目录原先直接构建旧实现 PlayerMenu v1.11.0，它依赖作者的
+        私有 Maven 仓库（HandyLib / HandyBom），在公开环境下无法解析依赖，因而
+        无法构建。旧实现已被 PlayerMenuNG 取代并删除，其最后状态保留在 git 历史
+        （提交 "修复 PlayerMenu 旧源码已知缺陷（删除前存档）"）中。
+
+        用法：
+            mvn clean package           # 构建 newgen
+            cd newgen && mvn clean package   # 等价，直接构建模块
+    -->
+
+    <modules>
+        <module>newgen</module>
+    </modules>
+
+</project>

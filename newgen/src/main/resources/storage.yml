@@ -1,0 +1,25 @@
+# 存储方法：SQLite 或 MySQL（请原样复制，不要自创写法）
+type: sqlite
+
+# SQLite 配置（type: sqlite 时生效）
+sqlite:
+  # 数据库文件名，位于插件数据目录下
+  file: menu.db
+
+# MySQL 配置（type: mysql 时生效）
+mysql:
+  host: 127.0.0.1
+  port: 3306
+  database: minecraft
+  username: root
+  password: ''
+  # 连接参数不要随意删减：
+  # useUnicode/characterEncoding 保证中文不乱码，serverTimezone 是 MySQL 8 驱动强制要求
+  parameters: useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
+  pool-size: 8
+  min-idle: 2
+  connection-timeout: 10000
+  max-lifetime: 1800000
+  keepalive-time: 300000
+
+# 注意：修改本文件后需要重启服务器，/plm reload 不会切换存储后端

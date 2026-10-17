@@ -1,0 +1,101 @@
+name: Build & Release
+
+on:
+  push:
+    branches:
+      - master
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - master
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      artifact_name: ${{ steps.meta.outputs.artifact_name }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          # 产物是 Java 17 字节码（folia-api 1.21.4 的上限要求），用 21 编译即可
+          java-version: '21'
+          cache: maven
+
+      # 依赖全部来自公开仓库（papermc / codemc / spigot / extendedclip / jitpack），
+      # 不需要任何私有 Maven 凭据
+      - name: Build with Maven
+        run: mvn --batch-mode --no-transfer-progress clean package
+
+      - name: Resolve artifact info
+        id: meta
+        run: |
+          set -euo pipefail
+          ARTIFACT_ID=$(mvn -q -DforceStdout -f newgen/pom.xml help:evaluate -Dexpression=project.artifactId)
+          VERSION=$(mvn -q -DforceStdout -f newgen/pom.xml help:evaluate -Dexpression=project.version)
+          JAR_NAME="${ARTIFACT_ID}-${VERSION}.jar"
+          JAR_PATH="newgen/target/${JAR_NAME}"
+
+          if [ ! -f "$JAR_PATH" ]; then
+            echo "::error::未找到构建产物: $JAR_PATH"
+            exit 1
+          fi
+
+          # artifact 名在同一次运行内必须唯一，带上 sha 避免并发冲突
+          ARTIFACT_NAME="${ARTIFACT_ID}-${VERSION}-${GITHUB_SHA::7}"
+
+          {
+            echo "artifact_id=$ARTIFACT_ID"
+            echo "version=$VERSION"
+            echo "jar_name=$JAR_NAME"
+            echo "jar_path=$JAR_PATH"
+            echo "artifact_name=$ARTIFACT_NAME"
+          } >> "$GITHUB_OUTPUT"
+
+          ls -lh "$JAR_PATH"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.artifact_name }}
+          path: ${{ steps.meta.outputs.jar_path }}
+          retention-days: 14
+          if-no-files-found: error
+
+  release:
+    name: Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download built JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.artifact_name }}
+          path: dist
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          draft: false
+          # 带预发布后缀（如 v1.2.3-beta.1）自动标记为 prerelease
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true
+          files: dist/**/*.jar
+          fail_on_unmatched_files: true

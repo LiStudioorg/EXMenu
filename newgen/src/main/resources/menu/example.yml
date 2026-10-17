@@ -1,0 +1,108 @@
+# 示例菜单。
+# 首次启动时本文件会被释放到 plugins/PlayerMenuNG/menu/ 下。
+
+# 界面标题
+title: '&8菜单 - 示例'
+
+# 界面大小，必须是 9 的倍数，范围 9~54
+size: 27
+
+# 绑定命令：玩家输入 /mc 即可打开本菜单
+openCommand:
+  - mc
+
+# 绑定物品：手持该材质右键空气即可打开本菜单
+# （若 config.yml 的 clock.menu 已填写，则此项失效）
+openItem:
+  - clock
+
+# 打开本菜单所需权限。
+# 仅当 config.yml 的 permission: true 时生效；
+# 留空或不写表示无需权限。
+permission: ''
+
+# 打开时播放的音效，留空则不播放
+sound: ''
+
+buttons:
+  # ---- 简单消息按钮 ----
+  - slot: 10
+    material: ARROW
+    name: '&e&l发送消息'
+    lore:
+      - '&7点击发送一条测试消息'
+    commands:
+      - '[message] &a你好, %player_name%!'
+      - '[sound] BLOCK_NOTE_BLOCK_PLING'
+
+  # ---- 控制台命令按钮（推荐用 [console]，不要用 [op]）----
+  - slot: 12
+    material: COMMAND_BLOCK
+    name: '&b&l执行命令'
+    lore:
+      - '&7以控制台身份执行命令'
+    commands:
+      - '[console] say 这是由菜单触发的控制台命令'
+
+  # ---- 带次数限制的按钮 ----
+  # id 必须全局唯一，且不能为 0。
+  # 修改本按钮任何配置前，请先删除 id 节点，改完再重新分配。
+  - slot: 14
+    material: DIAMOND
+    id: -1
+    name: '&a&l限领 3 次'
+    lore:
+      - '&7最多可点击 3 次'
+    limit: 3
+    commands:
+      - '[message] &a领取成功'
+      - '[console] give %player_name% diamond 1'
+
+  # ---- 带冷却的按钮 ----
+  - slot: 16
+    material: CLOCK
+    id: -2
+    name: '&e&l冷却 10 秒'
+    lore:
+      - '&7每 10 秒可点击一次'
+    cd: 10
+    commands:
+      - '[message] &a触发成功'
+
+  # ---- 带条件判断的按钮 ----
+  # 条件两侧都必须有值。右侧留空会被判定为"条件不满足"，导致按钮对所有人隐藏。
+  - slot: 20
+    material: NAME_TAG
+    name: '&d&l条件按钮'
+    lore:
+      - '&7仅当条件满足时可见'
+    conditions:
+      - '%player_name% != 无'
+    commands:
+      - '[message] &d条件满足，你看到了这个按钮'
+
+  # ---- 确认后执行的按钮 ----
+  - slot: 22
+    material: EMERALD
+    name: '&c&l需要确认'
+    lore:
+      - '&7点击后先弹出确认界面'
+    confirm: true
+    commands:
+      - '[message] &c你确认了此操作'
+
+  # ---- 关闭菜单 ----
+  - slot: 24
+    material: BARRIER
+    name: '&7&l关闭'
+    lore:
+      - '&7关闭当前菜单'
+    commands:
+      - '[close]'
+
+# ---- 装饰板：填充边框，避免误点 ----
+pane:
+  enable: true
+  slots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 17, 18, 19, 21, 23, 25, 26]
+  material: BLACK_STAINED_GLASS_PANE
+  name: ' '

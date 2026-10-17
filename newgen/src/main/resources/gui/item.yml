@@ -1,0 +1,37 @@
+# 物品库界面。
+# 用于浏览 menu_item 表里已存入的物品（/plm item 存入的那些）。
+size: 54
+title: '&8物品库'
+
+# 单个物品的显示名与描述，%id% 为物品库 id
+item:
+  name: '&e#%id% &7%material%'
+  lore:
+    - '&7id: &f%id%'
+    - '&7点击取出'
+
+# 上一页 / 下一页
+previous:
+  material: ARROW
+  name: '&e上一页'
+  slot: 45
+  enchant: false
+next:
+  material: ARROW
+  name: '&e下一页'
+  slot: 53
+  enchant: false
+
+# 关闭按钮
+close:
+  material: BARRIER
+  name: '&c关闭'
+  slot: 49
+  enchant: false
+
+# 装饰板
+pane:
+  material: GRAY_STAINED_GLASS_PANE
+  name: ' '
+  slots: [46, 47, 48, 50, 51, 52]
+  enchant: false

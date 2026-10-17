@@ -1,0 +1,49 @@
+# PlayerMenuNG language file - English
+# Keys map to LangUtil.message/plain/format calls in code. Do not rename keys.
+
+prefix: '&8[&bPlayerMenu&8] &r'
+
+# Common
+noPermission: '&cYou do not have permission to do that'
+playerOnly: '&cThis command can only be run by a player'
+noPlayerFailureMsg: '&cPlease specify an online player'
+playerNotOnline: '&cThat player is not online'
+noCommandPermission: '&cYou do not have permission to use that command'
+
+# Reload
+reloadMsg: '&aConfiguration reloaded'
+reloadFailureMsg: '&cFailed to reload configuration'
+
+# Menu
+noMenu: '&cThat menu does not exist'
+conditionFailure: '&cConditions not met'
+configError: '&cConfiguration error: %reason%'
+
+# Limits
+noTimeLimit: '&cPlease wait &e%time% &cmore seconds'
+clickOperatorReason: '&cAction not completed'
+
+# Economy
+noBalance: '&cYou do not have enough money'
+money: 'Money'
+point: 'Points'
+buyMsg: '&aPurchased for &e%price%'
+sellMsg: '&aSold for &e%price%'
+noLimitItem: '&cThat item cannot be purchased'
+
+# Items
+noItem: '&cYou do not have enough items'
+noNumber: '&cThe amount must be a number'
+noPositiveNumber: '&cThe amount must be positive'
+addMenuItemMsg: '&aAdded to item library, id: &e%id%'
+getMenuItemMsg: '&aItem received'
+clearSucceedMsg: '&aCleared'
+
+# Input
+noInput: '&cInput cannot be empty or contain the % symbol'
+inputExit: '&eType T to cancel input'
+inputPrompt: '&ePlease type your input in chat'
+inputTimeout: '&cInput cancelled'
+
+# Clock
+clockFailureMsg: '&cThe clock item feature is disabled'

@@ -1,0 +1,49 @@
+# PlayerMenuNG 语言文件 - 简体中文
+# 键名对应代码里的 LangUtil.message/plain/format 调用，请勿改动键名
+
+prefix: '&8[&bPlayerMenu&8] &r'
+
+# 通用
+noPermission: '&c你没有权限执行此操作'
+playerOnly: '&c该命令只能由玩家执行'
+noPlayerFailureMsg: '&c请指定一个在线玩家'
+playerNotOnline: '&c玩家不在线'
+noCommandPermission: '&c你没有权限使用该命令'
+
+# 重载
+reloadMsg: '&a配置已重载'
+reloadFailureMsg: '&c配置重载失败'
+
+# 菜单
+noMenu: '&c菜单不存在'
+conditionFailure: '&c条件不满足'
+configError: '&c配置异常: %reason%'
+
+# 限制
+noTimeLimit: '&c请等待 &e%time% &c秒后再试'
+clickOperatorReason: '&c操作未完成'
+
+# 经济
+noBalance: '&c你的余额不足'
+money: '金币'
+point: '点券'
+buyMsg: '&a购买成功，花费 &e%price%'
+sellMsg: '&a出售成功，获得 &e%price%'
+noLimitItem: '&c该物品无法购买'
+
+# 物品
+noItem: '&c你没有足够的物品'
+noNumber: '&c数量必须为数字'
+noPositiveNumber: '&c数量必须为正数'
+addMenuItemMsg: '&a物品已加入物品库，id: &e%id%'
+getMenuItemMsg: '&a物品已取出'
+clearSucceedMsg: '&a已清空'
+
+# 输入
+noInput: '&c输入不能为空或包含 % 符号'
+inputExit: '&e输入 T 可退出输入'
+inputPrompt: '&e请在聊天栏输入内容'
+inputTimeout: '&c输入已取消'
+
+# 时钟
+clockFailureMsg: '&c时钟物品功能未启用'
