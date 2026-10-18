@@ -83,7 +83,7 @@ public final class SettingsGuiManager {
             return;
         }
 
-        ChestGui gui = new ChestGui(4, TextUtil.color("&8EXMenu 配置中心"));
+        ChestGui gui = Guis.chest(4, TextUtil.color("&8EXMenu 配置中心"));
         gui.setOnGlobalClick(event -> event.setCancelled(true));
         StaticPane pane = new StaticPane(9, 4);
 
@@ -249,7 +249,7 @@ public final class SettingsGuiManager {
      * @param max    最大值
      */
     private void promptNumber(Player player, String path, String prompt, int min, int max) {
-        AnvilGui gui = new AnvilGui(TextUtil.color("&8" + prompt + "（" + min + "~" + max + "）"), plugin);
+        AnvilGui gui = Guis.anvil(TextUtil.color("&8" + prompt + "（" + min + "~" + max + "）"), plugin);
         ItemStack base = ItemStackUtil.build("PAPER", "&e输入后点右侧输出格确认",
                 Collections.emptyList(), false, 0, true, null, null);
         if (base != null) {

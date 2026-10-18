@@ -211,7 +211,7 @@ public final class MenuGuiManager implements MenuExecutor.GuiOpener, ConfigProvi
         int size = normalizeSize(menu.getInt("size", 27));
         String title = TextUtil.color(PlaceholderUtil.set(player, menu.getString("title", "菜单")));
 
-        ChestGui gui = new ChestGui(size / 9, title);
+        ChestGui gui = Guis.chest(size / 9, title);
         gui.setOnGlobalClick(event -> event.setCancelled(true));
 
         List<MenuButtonParam> buttons = parseButtons(menuFile, menu);

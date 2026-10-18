@@ -57,7 +57,7 @@ public final class AnvilInputManager {
         InputTypeEnum type = InputTypeEnum.parse(param.getInputType());
         String prompt = buildPrompt(param, type);
 
-        AnvilGui gui = new AnvilGui(prompt, plugin);
+        AnvilGui gui = Guis.anvil(prompt, plugin);
 
         // 底版纸：铁砧必须有输入物品，重命名栏才可编辑
         ItemStack base = ItemStackUtil.build("PAPER",

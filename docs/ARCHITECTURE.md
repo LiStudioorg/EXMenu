@@ -20,7 +20,7 @@ EXMenu 是 PlayerMenu v1.11.0 的**重写实现**：保持 YAML 配置语义与�
 | 跨版本材质 | ItemCompatLib | **XSeries** |
 | NBT | HandyLib 封装 | **item-nbt-api** |
 | 存储 | HandyLib `Db` 链式 API | **原生 JDBC + HikariCP** |
-| 源码规模 | 61 文件 / 211 KB | 42 文件 / 约 11.4k 行（含新手 GUI 工具链） |
+| 源码规模 | 61 文件 / 211 KB | 43 文件 / 约 11.5k 行（含新手 GUI 工具链） |
 
 **产物**：`newgen/target/EXMenu-1.1.0.jar`（约 16 MB，已 shade 并重定位）。
 
@@ -525,6 +525,7 @@ AsyncPlayerChatEvent (LOWEST, ignoreCancelled=true)
 | **`findMapByIds` O(n²) 去重** | 巨型菜单（几十个物品库按钮）打开时解析开销平方增长 | `LinkedHashSet` 去重 |
 | **`IN` 查询无分片** | id 数超过 999 时 SQLite 直接报错，渲染/清理路径崩 | 超过 500 自动分片合并 |
 | **`autoCreateId` 被 `create` 忽略** | 文档承诺自动分配 id，实际骨架硬编码无 id —— 新手照抄后 cd/limit 静默失效 | `create` 与编辑器新增按钮都按开关分配最小未占用负数 id |
+| **IF 0.12.1 Gui 构造器必崩** | 真实服务端（Leaves 1.21.11）首个反馈即命中：`processMethodAnnotations` 检查注解前无条件取 `getParameterTypes()[0]`，`ChestGui` 自带零参方法 → 所有 GUI 创建抛 AIOOBE | 新增 `inventory/Guis` 工厂：以"无声明方法的匿名子类"实例化（扫描只看运行时类自身），12 处创建点全部收口；无头复现验证 |
 
 ### 15.2 未完成（功能缺口）
 
@@ -668,6 +669,7 @@ mvn clean package
 | `MenuGuiManager` | 渲染 + 点击回调 | 批量查库（异步段）消除 N+1；`param.copy()` 防串味；单菜单缓存失效 |
 | `ConfirmGuiManager` | 二次确认界面 | 配置缺失时退化为直接执行 |
 | `ButtonParser` | YAML → 模型 | 宽容解析，结构性错误才丢弃 |
+| `Guis` | Gui 构造器缺陷绕行工厂 | 所有 Gui 必须经它创建（IF 0.12.1 注解扫描必崩，勿删 `{}`） |
 | `EditGuiManager` ★ | 可视化菜单编辑器 | 每玩家状态机；改动即时写盘（首次 `.bak`）+ 单菜单丢缓存；预览回跳 |
 | `SettingsGuiManager` ★ | 配置中心界面 | `YamlPatch` 保注释写盘 + 就地 reload |
 | `ItemLibraryGuiManager` ★ | 物品库浏览/选取 | 异步取数分页；选取模式供编辑器复用 |

@@ -250,7 +250,7 @@ public final class EditGuiManager implements Listener {
      */
     private void renderMain(Player player, EditState state, YamlConfiguration menu) {
         int size = menu.getInt("size", 27);
-        ChestGui gui = new ChestGui(6, TextUtil.color("&8编辑: &f"
+        ChestGui gui = Guis.chest(6, TextUtil.color("&8编辑: &f"
                 + TextUtil.stripColor(orDefault(menu.get("title"), state.menuFile))));
         gui.setOnGlobalClick(event -> event.setCancelled(true));
         StaticPane pane = new StaticPane(9, 6);
@@ -374,7 +374,7 @@ public final class EditGuiManager implements Listener {
      * @param state  会话
      */
     private void renderHelp(Player player, EditState state) {
-        ChestGui gui = new ChestGui(2, TextUtil.color("&8编辑帮助"));
+        ChestGui gui = Guis.chest(2, TextUtil.color("&8编辑帮助"));
         gui.setOnGlobalClick(event -> event.setCancelled(true));
         StaticPane pane = new StaticPane(9, 2);
         item(pane, 10, "CHEST", "&e基本操作",
@@ -405,7 +405,7 @@ public final class EditGuiManager implements Listener {
     private void renderButtonsIndex(Player player, EditState state, YamlConfiguration menu) {
         List<Map<String, Object>> buttons = readButtons(menu);
         int rows = Math.max(2, Math.min(6, buttons.size() / 9 + 2));
-        ChestGui gui = new ChestGui(rows, TextUtil.color("&8按钮列表（" + buttons.size() + " 个）"));
+        ChestGui gui = Guis.chest(rows, TextUtil.color("&8按钮列表（" + buttons.size() + " 个）"));
         gui.setOnGlobalClick(event -> event.setCancelled(true));
         StaticPane pane = new StaticPane(9, rows);
 
@@ -467,7 +467,7 @@ public final class EditGuiManager implements Listener {
         }
         Map<String, Object> button = buttons.get(state.buttonIndex);
 
-        ChestGui gui = new ChestGui(6, TextUtil.color("&8编辑按钮 #&f" + (state.buttonIndex + 1)
+        ChestGui gui = Guis.chest(6, TextUtil.color("&8编辑按钮 #&f" + (state.buttonIndex + 1)
                 + " &8槽位 &f" + slotListOf(button)));
         gui.setOnGlobalClick(event -> event.setCancelled(true));
         StaticPane pane = new StaticPane(9, 6);
@@ -793,7 +793,7 @@ public final class EditGuiManager implements Listener {
         int pages = Math.max(1, (lines.size() + LIST_PAGE_SIZE - 1) / LIST_PAGE_SIZE);
         int page = Math.min(state.listPage, pages - 1);
 
-        ChestGui gui = new ChestGui(4, TextUtil.color("&8" + state.listTitle
+        ChestGui gui = Guis.chest(4, TextUtil.color("&8" + state.listTitle
                 + " &7(" + (page + 1) + "/" + pages + ")"));
         gui.setOnGlobalClick(event -> event.setCancelled(true));
         StaticPane pane = new StaticPane(9, 4);
@@ -1211,7 +1211,7 @@ public final class EditGuiManager implements Listener {
      */
     private void promptText(Player player, EditState state, String prompt,
                             String current, Consumer<String> onSubmit) {
-        AnvilGui gui = new AnvilGui(TextUtil.color("&8" + prompt), plugin);
+        AnvilGui gui = Guis.anvil(TextUtil.color("&8" + prompt), plugin);
         ItemStack base = ItemStackUtil.build("PAPER",
                 "&e点右侧输出格确认",
                 Collections.singletonList("&7当前: " + abbreviate(orDefault(current, "&8空"), 30)

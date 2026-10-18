@@ -134,7 +134,7 @@ public final class ItemLibraryGuiManager {
         String baseTitle = TextUtil.color(guiConfig.getString("title", "&8物品库"));
         String title = baseTitle + " §7(" + (current + 1) + "/" + (maxPage + 1) + ")";
 
-        ChestGui gui = new ChestGui(rows, title);
+        ChestGui gui = Guis.chest(rows, title);
         gui.setOnGlobalClick(event -> event.setCancelled(true));
         // select/cancel：选取模式下"选中"与"取消"两条路互斥，用 consumed 标志区分
         // "玩家自己关掉界面"与"选中后调用方主动切换界面"两种关法

@@ -39,7 +39,7 @@ EXMenu 是一个 **YAML 驱动**的 Minecraft 箱子菜单插件。服主写 YAM
 |---|---|
 | 插件名 | `EXMenu` |
 | 主类 | `cn.listudio.exmenu.MenuPlugin` |
-| 源码 | `newgen/src/main/java/cn/listudio/exmenu/`（42 个文件，约 11.4k 行） |
+| 源码 | `newgen/src/main/java/cn/listudio/exmenu/`（43 个文件，约 11.5k 行） |
 | 资源 | `newgen/src/main/resources/`（9 个 YAML） |
 | 字节码 | Java 17 |
 | 构建 | Maven（根 pom 为聚合 pom） |
@@ -71,7 +71,7 @@ EXMenu 是一个 **YAML 驱动**的 Minecraft 箱子菜单插件。服主写 YAM
 | 依赖 | 版本 | 作用域 | 说明 |
 |---|---|---|---|
 | `dev.folia:folia-api` | 1.21.4-R0.1 | provided | 编译期契约，运行期由服务端提供 |
-| `com.github.stefvanschie.inventoryframework:IF` | 0.12.1 | compile | **被 shade 重定位** |
+| `com.github.stefvanschie.inventoryframework:IF` | 0.12.1 | compile | **被 shade 重定位**；⚠️ 该版本 Gui 构造器有必崩缺陷，所有 Gui 必须经 `inventory/Guis` 工厂创建（见 §14.5） |
 | `com.cryptomorin:XSeries` | 14.0.0 | compile | **被重定位**，跨版本材质解析 |
 | `de.tr7zw:item-nbt-api` | 2.15.4 | compile | **被重定位**；⚠️ 当前无源码引用 |
 | `com.zaxxer:HikariCP` | 4.0.3 | compile | 连接池，**不重定位** |
@@ -206,7 +206,7 @@ presentation  →  render  →  core  →  persistence  →  model
 |---|---|---|
 | `command` | 1 | 解析 `/exmenu`，权限校验，Tab 补全 |
 | `listener` | 4 | 聊天输入拦截、时钟物品右键、玩家退出清理、首次启动引导 |
-| `inventory` | 11 | 渲染与界面交互（含编辑器 / 配置中心 / 物品库 / 铁砧输入） |
+| `inventory` | 12 | 渲染与界面交互（含编辑器 / 配置中心 / 物品库 / 铁砧输入 / Gui 工厂） |
 | `core` | 4 | 准入检查、动作执行、条件求值、限制缓存 |
 | `expansion` | 1 | 对外 PAPI 变量（PAPI 在位才注册） |
 | `service` | 2 | 物品库与限制的业务封装 |
@@ -973,10 +973,11 @@ storage = "mysql".equals(type) ? new MysqlStorage() : new SqliteStorage();
 需要"先异步取数再建界面"的例子看 `ItemLibraryGuiManager`，
 需要"文本输入 + 取消回跳"的例子看 `AnvilInputManager`。
 
-IFramework 的最小模式：
+IFramework 的最小模式（注意：`Guis.chest` 是本项目对 IF 0.12.1
+构造器缺陷的强制绕行，见 §14.5 —— **不要写成裸 `new ChestGui`**）：
 
 ```java
-ChestGui gui = new ChestGui(rows, title);
+ChestGui gui = Guis.chest(rows, title);
 gui.setOnGlobalClick(event -> event.setCancelled(true));   // 必备
 StaticPane pane = new StaticPane(9, rows);
 
@@ -992,6 +993,8 @@ gui.show(player);
 
 **要点**：
 
+- Gui 一律经 `Guis.chest / Guis.anvil` 创建，新增 GUI 类型时在 `Guis` 补工厂方法；
+  也不要调用 `gui.copy()`（内部会重建原生类实例，重新踩坑）
 - `setOnGlobalClick` 取消是**必须的**，否则玩家能把菜单里的物品拖进背包
 - `Slot.fromIndex(slot)` 的 slot 从 0 开始
 - 关闭界面用 `gui.close()` —— 但必须从**实体线程**调用
@@ -1154,6 +1157,7 @@ gui.show(player);
 | `findMapByIds` 用 `List.contains` 去重 | 大菜单 O(n²) —— 改 `LinkedHashSet` |
 | `IN` 查询无分片 | 参数超 999 时 SQLite 报错 —— 500 一片自动分片 |
 | `autoCreateId` 被 `create` 忽略 | 新手照抄骨架后 cd/limit 静默失效 —— `create` 与编辑器都按开关分配负数 id |
+| **IF 0.12.1 Gui 构造器必崩**（真实服务端首个反馈） | `processMethodAnnotations` 在检查注解前无条件取 `getParameterTypes()[0]`，而 `ChestGui` 自带零参方法 —— **任何 GUI 创建（含普通菜单渲染）直接 AIOOBE 崩溃** | 所有 Gui 经 `inventory/Guis` 工厂以"无声明方法的匿名子类"创建；已无头复现验证（裸 new 必崩 / 工厂可完整构造）。IF 发布修复版后可回退 |
 
 > 多数属于"配置/代码语义错位""漏分支"或"跨线程假设不成立"。
 > 新增功能时对照此表自检。
@@ -1216,6 +1220,7 @@ gui.show(player);
 | `storage/Storage` | 83 | 存储接口 |
 | `inventory/InputSession` | 68 | 输入会话 |
 | `listener/ChatInputListener` | 67 | 聊天输入拦截 |
+| `inventory/Guis` ★ | 37 | IF 0.12.1 构造器崩溃的强制绕行工厂 |
 | `listener/PlayerQuitListener` | 44 | 退出清理 |
 | `inventory/ConfigProvider` | 17 | 配置快照接口 |
 

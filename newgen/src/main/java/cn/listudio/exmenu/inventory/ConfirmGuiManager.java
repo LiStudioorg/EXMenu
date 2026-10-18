@@ -58,7 +58,7 @@ public final class ConfirmGuiManager {
         int size = normalizeSize(confirm.getInt("size", 27));
         String title = TextUtil.color(confirm.getString("title", "确认操作"));
 
-        ChestGui gui = new ChestGui(size / 9, title);
+        ChestGui gui = Guis.chest(size / 9, title);
         gui.setOnGlobalClick(event -> event.setCancelled(true));
 
         StaticPane pane = new StaticPane(9, size / 9);
